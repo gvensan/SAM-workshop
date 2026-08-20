@@ -9,6 +9,7 @@ Step-by-step deployment of the Multi-Agent Travel Planning System with SAM Deskt
 - [Overview](#overview)
 - [Prerequisites](#prerequisites)
 - [Architecture](#architecture)
+- [Amadeus Mock Service (No API Key Required)](#amadeus-mock-service-no-api-key-required)
 - [Step 1: Install & Configure SAM Desktop](#step-1-install--configure-sam-desktop)
 - [Step 2: Deploy MCP Server (Places)](#step-2-deploy-mcp-server-places)
 - [Step 3: Deploy External A2A Agent (Weather Advisor)](#step-3-deploy-external-a2a-agent-weather-advisor)
@@ -48,12 +49,14 @@ This guide walks you through deploying the **Multi-Agent Travel Planning System*
 
 | Service | Cost | Sign Up | Used By |
 |---|---|---|---|
-| **Amadeus for Developers** | Free sandbox | [developers.amadeus.com/register](https://developers.amadeus.com/register) | OpenAPI connector — flights & hotels |
+| **Amadeus for Developers** | Free sandbox | [developers.amadeus.com/register](https://developers.amadeus.com/register) | OpenAPI connector — flights & hotels (**or use mock — see below**) |
 | **Foursquare Places API** | Free (1,000 calls/day) | [foursquare.com/developers/signup](https://foursquare.com/developers/signup) | MCP server — restaurants & attractions |
 | **Anthropic Claude API** | Pay-as-you-go | [console.anthropic.com](https://console.anthropic.com/settings/keys) | A2A agent — activity recommendations (optional) |
 | **Open-Meteo** | Completely free — no signup | [open-meteo.com](https://open-meteo.com/) | A2A agent — weather data |
 
-> **Amadeus:** After signing up go to "My Self-Service Workspace" → "Create a new app". You'll receive an **API Key** (client_id) and **API Secret** (client_secret). The free sandbox uses synthetic test data only.
+> **No Amadeus key?** Use the included **Amadeus Mock Service** (`external/amadeus-mock/`). It runs locally in Docker, requires zero credentials, and returns realistic deterministic flight and hotel data. See the [Amadeus Mock Service](#amadeus-mock-service-no-api-key-required) section below.
+
+> **Amadeus (real):** After signing up go to "My Self-Service Workspace" → "Create a new app". You'll receive an **API Key** (client_id) and **API Secret** (client_secret). The free sandbox uses synthetic test data only.
 
 > **Foursquare:** After signup go to Developer Console → Create a Project → click the project → open **Legacy API Keys**. Click the key to reveal the **Client ID** and **Client Secret** — you need both. The MCP server uses the Legacy Places API v2 (`api.foursquare.com/v2/venues/search`). Do _not_ use the single-field Service API Key (fsq3…) — that is for the v3 API which requires a paid plan to activate.
 
@@ -91,6 +94,10 @@ graph TB
         Weather["WeatherAdvisorAgent<br/><i>LangChain + Open-Meteo</i>"]
     end
 
+    subgraph MockDocker["Docker: amadeus-mock :8080 (optional)"]
+        MockSvc["Amadeus Mock Service<br/><i>FastAPI — no key needed</i>"]
+    end
+
     subgraph APIs["External APIs (no containers)"]
         Amadeus["Amadeus Sandbox"]
         Foursquare["Foursquare Places"]
@@ -105,10 +112,87 @@ graph TB
 
     Flight -->|"OpenAPI/OAuth2"| Amadeus
     Hotel -->|"OpenAPI/OAuth2"| Amadeus
+    Flight -. "OR (no key)" .-> MockSvc
+    Hotel -. "OR (no key)" .-> MockSvc
     Local -->|"MCP/SSE"| PlacesMCP
     PlacesMCP --> Foursquare
     Weather --> OpenMeteo
 ```
+
+---
+
+## Amadeus Mock Service (No API Key Required)
+
+The workshop includes a local Amadeus mock service that simulates the real Amadeus flight and hotel APIs. Use this if you don't have an Amadeus API key or want fully offline demos.
+
+| | Real Amadeus Sandbox | Amadeus Mock |
+|---|---|---|
+| API key needed | Yes (free signup) | **No** |
+| Network required | Yes | No (local Docker) |
+| Data | Synthetic (Amadeus test data) | Deterministic mock data |
+| Rate limits | Yes | None |
+| Price consistency | Varies | Same query → same price |
+| Base URL | `https://test.api.amadeus.com` | `http://localhost:8080` |
+
+### Start the Mock
+
+```bash
+cd external/amadeus-mock/
+docker compose up -d
+
+# Verify
+curl http://localhost:8080/health
+# {"status":"ok","service":"amadeus-mock","version":"1.0.0"}
+```
+
+### Generate a Bearer Token
+
+The mock implements the same OAuth2 `client_credentials` flow as the real Amadeus API:
+
+```bash
+# Get an access token (credentials: test / test)
+curl -s -X POST http://localhost:8080/v1/security/oauth2/token \
+  -d "client_id=test&client_secret=test&grant_type=client_credentials"
+
+# One-liner to capture it into a shell variable
+TOKEN=$(curl -s -X POST http://localhost:8080/v1/security/oauth2/token \
+  -d "client_id=test&client_secret=test&grant_type=client_credentials" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+echo $TOKEN
+```
+
+### Smoke Test
+
+```bash
+# Search for flights SIN → LHR on 2025-06-01
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/v2/shopping/flight-offers?originLocationCode=SIN&destinationLocationCode=LHR&departureDate=2025-06-01&adults=1" \
+  | python3 -m json.tool | head -40
+
+# Search for hotels in London (city code LON)
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/v1/reference-data/locations/hotels/by-city?cityCode=LON" \
+  | python3 -m json.tool | head -30
+```
+
+### Supported Routes (Flights)
+
+| Origin | Destination | Carriers |
+|---|---|---|
+| SIN | LHR | SQ, BA, QF |
+| SIN | SYD | SQ, QF |
+| JFK | LAX | AA, UA, DL |
+| LHR | CDG | BA, AF |
+| DXB | SIN | EK, SQ |
+| SIN | HND | SQ, NH, JL |
+| SIN | BKK | SQ, TG |
+| HKG | LHR | CX, BA |
+
+### Supported Hotel Cities
+
+`SIN` (Singapore), `LON` (London), `PAR` (Paris), `TYO` (Tokyo), `NYC` (New York), `DXB` (Dubai), `BKK` (Bangkok)
+
+> **SAM Connector for Mock:** When configuring SAM Desktop connectors, use base URL `http://localhost:8080`, upload the spec from `external/amadeus-mock/openapi.json`, and set credentials `test`/`test`. See [Step 5.1](#51-create-openapi-connectors-amadeus) Option B for full steps.
 
 ---
 
@@ -148,7 +232,10 @@ sam-work-dir/
 ├── toolsets/          # Go toolset zip files
 ├── agents/            # Agent YAML configurations
 ├── connectors/        # Connector configurations
-└── external/          # MCP server & A2A agent source
+└── external/          # MCP server, A2A agent & mock source
+    ├── places-mcp-server/
+    ├── weather-advisor-agent/
+    └── amadeus-mock/  # Local Amadeus mock (no API key needed)
 ```
 
 ---
@@ -311,7 +398,11 @@ cd dist && zip -j ../../../travel-planner.zip travel-planner manifest.yaml
 
 ### 5.1 Create OpenAPI Connectors (Amadeus)
 
-#### Flight Search Connector
+Choose **Option A** (real Amadeus sandbox — requires API key) or **Option B** (local mock — no key needed).
+
+#### Option A — Real Amadeus Sandbox
+
+**Flight Search Connector**
 
 1. SAM Desktop → **Connectors** → **Add Connector**
 2. Type: **API** (OpenAPI)
@@ -322,11 +413,31 @@ cd dist && zip -j ../../../travel-planner.zip travel-planner manifest.yaml
 7. Token Endpoint Auth Method: **client_secret_post**
 8. Name: `amadeus-flights` → Save
 
-#### Hotel Search Connector
+**Hotel Search Connector**
 
 1. Repeat the steps above with one difference:
 2. Spec URL: `https://raw.githubusercontent.com/amadeus4dev/amadeus-open-api-specification/main/spec/json/HotelSearch_v3.json`
 3. Name: `amadeus-hotels` → Save
+
+#### Option B — Amadeus Mock (No API Key)
+
+> Make sure the mock is running first: `cd external/amadeus-mock && docker compose up -d`
+
+**Single connector covers both flights and hotels:**
+
+1. SAM Desktop → **Connectors** → **Add Connector**
+2. Type: **API** (OpenAPI)
+3. Base URL: `http://localhost:8080`
+4. Upload spec: click **Upload file** → select `external/amadeus-mock/openapi.json`
+5. Auth Type: **OAuth2**
+6. Token URL: `http://localhost:8080/v1/security/oauth2/token`
+7. Client ID: `test` / Client Secret: `test`
+8. Token Endpoint Auth Method: **client_secret_post**
+9. Name: `amadeus-mock` → Save
+
+> The mock's `openapi.json` includes all endpoints (flights + hotels) in a single file so you only need one connector. Point both `FlightSearchAgent` and `HotelSearchAgent` to `amadeus-mock`.
+
+> **SSRF note:** `SAM_PLATFORM_ALLOW_PRIVATE_MCP=true` (Step 1.2) also unblocks HTTP connectors pointing to `localhost`. This is required for the mock connector to work.
 
 ### 5.2 Create MCP Connector (Places)
 
@@ -352,31 +463,163 @@ cd dist && zip -j ../../../travel-planner.zip travel-planner manifest.yaml
 #### FlightSearchAgent
 
 1. Agents → Add Agent → Name: `FlightSearchAgent`
-2. Description: `Searches for flights using the Amadeus API`
-3. Instruction: `You are the Flight Search specialist. Use the getFlightOffers tool. Use IATA codes: SIN=Singapore, LHR=London, CDG=Paris, NRT=Tokyo, JFK=New York`
-4. Connector: `amadeus-flights` → Save
+2. Description: `Searches for flights using the Amadeus API and returns structured flight options`
+3. Connector: `amadeus-flights` (or `amadeus-mock`) → Save
+4. **Instruction** (paste the full prompt below):
+
+```
+You are the Flight Search specialist for a travel planning system. Your role is to find the best flight options using the Amadeus API.
+
+SEARCH PROCESS:
+1. Extract origin, destination, departure date, return date (if round-trip), number of adults, and travel class from the request
+2. Convert city names to IATA codes using the reference table below
+3. Call the flight search tool with the correct parameters
+4. If no direct results, try nearby airports or alternate dates
+
+IATA CODE REFERENCE:
+- Singapore: SIN | London: LHR | Paris: CDG | Tokyo: NRT or HND
+- New York: JFK or EWR | Los Angeles: LAX | Dubai: DXB | Sydney: SYD
+- Bangkok: BKK | Hong Kong: HKG | Amsterdam: AMS | Frankfurt: FRA
+- Kuala Lumpur: KUL | Seoul: ICN | Mumbai: BOM | Sydney: SYD
+
+RESPONSE FORMAT:
+Present 3 options in a structured table:
+1. Cheapest option — lowest total price, even if longer
+2. Fastest option — shortest travel time, even if more expensive
+3. Best value — balanced score of price + duration + stops
+
+For each option include:
+- Airline + flight number(s)
+- Departure and arrival times with duration
+- Number of stops (direct / 1 stop / 2 stops)
+- Cabin class
+- Total price per adult and grand total
+- Baggage allowance if available
+
+Always quote prices in the currency returned by the API. If the search returns no results, explain which routes are available and suggest alternatives.
+```
 
 #### HotelSearchAgent
 
 1. Agents → Add Agent → Name: `HotelSearchAgent`
-2. Description: `Searches for hotels using the Amadeus API`
-3. Instruction: `You are the Hotel Search specialist. Use the getMultiHotelOffers tool. City codes: SIN, LON, PAR, TYO, NYC`
-4. Connector: `amadeus-hotels` → Save
+2. Description: `Searches for hotels using the Amadeus API and returns structured accommodation options`
+3. Connector: `amadeus-hotels` (or `amadeus-mock`) → Save
+4. **Instruction** (paste the full prompt below):
+
+```
+You are the Hotel Search specialist for a travel planning system. Your role is to find the best accommodation options using the Amadeus API.
+
+SEARCH PROCESS:
+Step 1 — Get hotel list: Call the hotel list tool with the destination city code to retrieve available hotel IDs.
+Step 2 — Get offers: Call the hotel offers tool with those hotel IDs, check-in date, check-out date, number of guests, and room quantity.
+
+SUPPORTED CITY CODES:
+SIN (Singapore), LON (London), PAR (Paris), TYO (Tokyo), NYC (New York),
+DXB (Dubai), BKK (Bangkok), SYD (Sydney), HKG (Hong Kong), AMS (Amsterdam)
+
+When converting destination names: London→LON, Paris→PAR, Tokyo→TYO, New York→NYC, Singapore→SIN
+
+RESPONSE FORMAT:
+Present 3–5 hotel options in a structured table covering:
+- Budget range (most affordable options)
+- Mid-range options (best value)
+- Luxury option (premium choice)
+
+For each hotel include:
+- Hotel name and star rating
+- Room type and bed configuration
+- Price per night and total stay cost
+- Cancellation policy (free cancellation / non-refundable)
+- Key amenities (pool, gym, breakfast included, etc.)
+- Distance from city centre if available
+
+Calculate total accommodation cost for the full stay. Note any mandatory fees or taxes. If hotel offers are unavailable for specific dates, suggest ±2 day flexibility.
+```
 
 #### LocalExperiencesAgent
 
 1. Agents → Add Agent → Name: `LocalExperiencesAgent`
-2. Description: `Finds restaurants and attractions at the destination`
-3. Instruction: `You are the Local Experiences specialist. Use find_restaurants and find_attractions tools to discover what to see and eat at the destination.`
-4. Connector: `places-mcp` → Save
+2. Description: `Finds restaurants and attractions at the destination using Foursquare`
+3. Connector: `places-mcp` → Save
+4. **Instruction** (paste the full prompt below):
+
+```
+You are the Local Experiences specialist for a travel planning system. Your role is to discover the best restaurants and attractions at travel destinations using real-time local data.
+
+SEARCH STRATEGY:
+- Use find_restaurants to discover dining options with diverse cuisine types
+- Use find_attractions to discover sightseeing and cultural experiences
+- Search with the destination city name as the location query
+- Run multiple searches for different categories if needed (e.g. "Japanese restaurants Tokyo", "street food Bangkok")
+
+RESPONSE FORMAT:
+Organise results into two sections:
+
+**Dining Recommendations** (5–8 options):
+- Group by cuisine type or meal occasion (breakfast spots, local street food, fine dining)
+- Include: name, cuisine, price range ($ / $$ / $$$ / $$$$), must-try dishes, area/neighbourhood
+- Add 1–2 insider tips (best time to visit, reservation needed, cash only, etc.)
+
+**Attractions & Experiences** (6–10 options):
+- Group by category: Cultural & Historical / Nature & Outdoors / Entertainment / Shopping
+- Include: name, brief description, estimated visit duration, entry fee if known, best time to visit
+- Highlight 2–3 "hidden gem" picks that are off the typical tourist trail
+
+Close with a suggested 1-day highlights itinerary combining the top picks from both sections.
+```
 
 #### TravelOrchestratorAgent
 
 1. Agents → Add Agent → Name: `TravelOrchestratorAgent`
-2. Description: `Orchestrates multi-agent travel planning`
-3. Instruction: `You are the Travel Orchestrator. Coordinate FlightSearchAgent, HotelSearchAgent, LocalExperiencesAgent, and WeatherAdvisorAgent to gather all travel information. Then use compile_itinerary to build the day-by-day plan and calculate_budget for the cost breakdown.`
-4. Toolset: `travel-planner` → Save
-5. Set "Can delegate to": FlightSearchAgent, HotelSearchAgent, LocalExperiencesAgent, WeatherAdvisorAgent
+2. Description: `Master orchestrator that coordinates all travel agents to build a complete trip plan`
+3. Toolset: `travel-planner` → Save
+4. Set "Can delegate to": FlightSearchAgent, HotelSearchAgent, LocalExperiencesAgent, WeatherAdvisorAgent
+5. **Instruction** (paste the full prompt below):
+
+```
+You are the Travel Orchestrator — the master coordinator of a multi-agent travel planning system. Your role is to deliver a complete, personalised travel plan by coordinating specialised agents and assembling their results into a polished itinerary.
+
+WORKFLOW (follow these steps in order):
+1. EXTRACT: Parse the user's request for: origin, destination, travel dates, number of travellers, budget range, interests/preferences, and any special requirements
+2. DELEGATE FLIGHTS: Ask FlightSearchAgent for flight options matching the dates and traveller count
+3. DELEGATE HOTELS: Ask HotelSearchAgent for accommodation options matching the stay dates and guest count
+4. DELEGATE LOCAL: Ask LocalExperiencesAgent for restaurants and attractions at the destination
+5. DELEGATE WEATHER: Ask WeatherAdvisorAgent for the weather forecast for the destination during the travel dates
+6. COMPILE ITINERARY: Call the compile_itinerary tool with the collected flights, hotels, and experiences data to generate a structured day-by-day plan
+7. CALCULATE BUDGET: Call the calculate_budget tool with flights cost, hotel cost, estimated daily expenses, and number of days/travellers to produce a full cost breakdown
+8. PRESENT: Deliver the final plan in the format below
+
+OUTPUT FORMAT:
+
+## ✈️ [Origin] → [Destination] | [Dates] | [N] Travellers
+
+### Flight Summary
+[Recommended flight option with key details — use FlightSearchAgent results]
+
+### Accommodation
+[Recommended hotel with nightly rate and total — use HotelSearchAgent results]
+
+### Weather Outlook
+[Forecast summary with packing tips — use WeatherAdvisorAgent results]
+
+### Day-by-Day Itinerary
+[Day-by-day plan from compile_itinerary — include morning/afternoon/evening activities, dining suggestions woven in]
+
+### Local Highlights
+[Top 3 dining picks + top 3 attraction picks from LocalExperiencesAgent]
+
+### Budget Breakdown
+[Full cost table from calculate_budget: flights, accommodation, food, activities, transport, total per person and grand total]
+
+### Booking Tips
+[2–3 practical tips: book X weeks in advance, visa requirements, best areas to stay, transport from airport]
+
+STYLE GUIDELINES:
+- Be specific — use real place names, actual prices from the tools, real flight times
+- If an agent returns no data, note it gracefully and continue with available data
+- Keep the tone warm, practical, and helpful — like advice from a well-travelled friend
+- Always show the grand total cost prominently so the user can make an informed decision
+```
 
 ---
 
@@ -457,6 +700,10 @@ Include flights, hotels, restaurants, attractions, weather forecast, and full bu
 | "agent card fetch returned status 404" when registering A2A agent | SAM Desktop tries `/.well-known/agent-card.json` first before falling back to `/.well-known/agent.json` — the server was only serving the second path | The agent now serves both paths. Rebuild: `docker rm -f weather-advisor && docker build -t weather-advisor-agent external/weather-advisor-agent/ && docker run -d --name weather-advisor -p 10000:10000 weather-advisor-agent` |
 | Foursquare returns 401 | Wrong key type (Service API Key instead of Legacy) or invalid credentials | Go to Foursquare Developer Console → project → **Legacy API Keys** → click the key to reveal Client ID and Client Secret. Restart container with correct env vars. |
 | Amadeus returns empty results | Sandbox has limited test routes | Try popular sandbox routes: LHR→CDG, JFK→LAX, SIN→NRT, SYD→MEL |
+| Mock connector returns "connection refused" | Mock container not running | `cd external/amadeus-mock && docker compose up -d` then retry |
+| Mock returns 401 Unauthorized | Bearer token expired or missing | Re-run the token curl: `curl -s -X POST http://localhost:8080/v1/security/oauth2/token -d "client_id=test&client_secret=test&grant_type=client_credentials"` |
+| Mock returns empty flight results | Unsupported route | Mock only covers 8 routes. Supported: SIN↔LHR, SIN↔SYD, JFK↔LAX, LHR↔CDG, DXB↔SIN, SIN↔HND, SIN↔BKK, HKG↔LHR |
+| SAM OpenAPI connector rejects mock spec upload | Spec format issue | Use `external/amadeus-mock/openapi.json` (JSON format). The `openapi.yaml` in the same folder will be rejected by SAM — use the `.json` file. |
 | Weather agent returns no AI recommendations | `ANTHROPIC_API_KEY` not set | Restart: `docker rm -f weather-advisor && docker run -d --name weather-advisor -p 10000:10000 -e ANTHROPIC_API_KEY="sk-..." weather-advisor-agent` |
 | `curl http://localhost:3001/health` returns "Connection reset by peer" but container shows healthy | Uvicorn bound to IPv6-only (`::`) inside container; Docker macOS bridge is IPv4 only | Ensure `ENV HOST=0.0.0.0` is in the Dockerfile (already included). Rebuild the image. |
 | Port already in use (3001 or 10000) | Another process using the port | Find: `lsof -i :3001`. Kill it or use alternate port: `-p 3002:3001` and update SAM connector URL. |
@@ -470,10 +717,12 @@ docker ps
 # View logs
 docker logs places-mcp
 docker logs weather-advisor
+docker logs amadeus-mock
 
 # Restart
 docker restart places-mcp
 docker restart weather-advisor
+docker restart amadeus-mock
 
 # Remove and re-run (after env var change)
 docker rm -f places-mcp
@@ -482,9 +731,14 @@ docker run -d --name places-mcp -p 3001:3001 \
   -e FOURSQUARE_CLIENT_SECRET="YOUR_CLIENT_SECRET" \
   --restart unless-stopped places-mcp-server
 
+# Amadeus mock (no credentials needed)
+docker rm -f amadeus-mock
+cd external/amadeus-mock && docker compose up -d
+
 # Rebuild images after code changes
-docker build -t places-mcp-server    external/places-mcp-server/
+docker build -t places-mcp-server     external/places-mcp-server/
 docker build -t weather-advisor-agent external/weather-advisor-agent/
+docker build -t amadeus-mock          external/amadeus-mock/
 ```
 
 ### Quick Start (All-in-One Script)
@@ -492,10 +746,14 @@ docker build -t weather-advisor-agent external/weather-advisor-agent/
 ```bash
 #!/bin/bash
 # Run from your sam-work-dir
+# Usage: FOURSQUARE_CLIENT_ID=xxx FOURSQUARE_CLIENT_SECRET=xxx ./start-workshop.sh
+# If you have no Amadeus key, set USE_MOCK=true to start the local mock instead.
 
 set -e
 
-# 1. Enable local MCP servers in SAM Desktop
+USE_MOCK="${USE_MOCK:-false}"
+
+# 1. Enable local MCP/API servers in SAM Desktop
 ENV_FILE="$HOME/Library/Application Support/sam/.env"
 if ! grep -q "SAM_PLATFORM_ALLOW_PRIVATE_MCP" "$ENV_FILE" 2>/dev/null; then
   echo 'SAM_PLATFORM_ALLOW_PRIVATE_MCP=true' >> "$ENV_FILE"
@@ -518,12 +776,29 @@ docker run -d --name weather-advisor -p 10000:10000 \
   -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
   --restart unless-stopped weather-advisor-agent
 
-# 4. Verify
+# 4. (Optional) Start Amadeus mock if no real API key
+if [ "$USE_MOCK" = "true" ]; then
+  echo "Starting Amadeus mock service..."
+  cd external/amadeus-mock
+  docker compose up -d
+  cd ../..
+fi
+
+# 5. Verify all services
 sleep 3
 echo ""
 echo "=== Health Checks ==="
 curl -s http://localhost:3001/health  && echo ""
 curl -s http://localhost:10000/health && echo ""
+if [ "$USE_MOCK" = "true" ]; then
+  curl -s http://localhost:8080/health && echo ""
+  echo ""
+  echo "=== Mock Token Test ==="
+  TOKEN=$(curl -s -X POST http://localhost:8080/v1/security/oauth2/token \
+    -d "client_id=test&client_secret=test&grant_type=client_credentials" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+  echo "Token: ${TOKEN:0:20}..."
+fi
 echo ""
 echo "=== MCP SSE Handshake ==="
 curl -s --max-time 2 http://localhost:3001/mcp | head -2
@@ -534,7 +809,15 @@ echo "Next: In SAM Desktop:"
 echo "  1. Import toolset: toolsets/travel-planner.zip"
 echo "  2. Add MCP connector: http://localhost:3001/mcp (SSE, no auth)"
 echo "  3. Add Remote Agent: http://localhost:10000"
-echo "  4. Create agents and start chatting!"
+if [ "$USE_MOCK" = "true" ]; then
+  echo "  4. Add OpenAPI connector: base URL http://localhost:8080"
+  echo "     Upload spec: external/amadeus-mock/openapi.json"
+  echo "     OAuth2: token URL http://localhost:8080/v1/security/oauth2/token"
+  echo "     Credentials: client_id=test / client_secret=test"
+else
+  echo "  4. Add OpenAPI connectors for Amadeus flights and hotels"
+fi
+echo "  5. Create agents and start chatting!"
 ```
 
 ---
