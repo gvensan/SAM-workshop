@@ -573,8 +573,7 @@ Close with a suggested 1-day highlights itinerary combining the top picks from b
 1. Agents → Add Agent → Name: `TravelOrchestratorAgent`
 2. Description: `Master orchestrator that coordinates all travel agents to build a complete trip plan`
 3. Toolset: `travel-planner` → Save
-4. Set "Can delegate to": FlightSearchAgent, HotelSearchAgent, LocalExperiencesAgent, WeatherAdvisorAgent
-5. **Instruction** (paste the full prompt below):
+4. **Instruction** (paste the full prompt below):
 
 ```
 You are the Travel Orchestrator — the master coordinator of a multi-agent travel planning system. Your role is to deliver a complete, personalised travel plan by coordinating specialised agents and assembling their results into a polished itinerary.
