@@ -21,6 +21,8 @@ CARRIERS = {
     "JL": "JAPAN AIRLINES",
     "TK": "TURKISH AIRLINES",
     "NH": "ANA - ALL NIPPON AIRWAYS",
+    "AI": "AIR INDIA",
+    "6E": "INDIGO",
 }
 
 AIRCRAFT = {
@@ -47,6 +49,9 @@ AIRPORTS = {
     "BKK": {"cityCode": "BKK", "countryCode": "TH", "name": "SUVARNABHUMI AIRPORT"},
     "HKG": {"cityCode": "HKG", "countryCode": "HK", "name": "HONG KONG INTL"},
     "FRA": {"cityCode": "FRA", "countryCode": "DE", "name": "FRANKFURT MAIN"},
+    "DEL": {"cityCode": "DEL", "countryCode": "IN", "name": "INDIRA GANDHI INTL"},
+    "BOM": {"cityCode": "BOM", "countryCode": "IN", "name": "CHHATRAPATI SHIVAJI MAHARAJ INTL"},
+    "BLR": {"cityCode": "BLR", "countryCode": "IN", "name": "KEMPEGOWDA INTL"},
 }
 
 # ------------------------------------------------------------------
@@ -342,6 +347,229 @@ ROUTES = {
             "PREMIUM_ECONOMY": 1500,
             "BUSINESS": 3800,
             "FIRST": 7800,
+        },
+    },
+    # ---- India routes ----
+    ("DEL", "LHR"): {
+        "options": [
+            {
+                "carrier": "AI",
+                "flightNo": "AI161",
+                "aircraft": "789",
+                "departureTime": "01:30",
+                "durationMinutes": 560,  # 9h20m direct
+                "stops": [],
+                "terminal_dep": "3",
+                "terminal_arr": "2",
+                "seats": 12,
+            },
+            {
+                "carrier": "EK",
+                "flightNo": "EK511",
+                "aircraft": "388",
+                "departureTime": "04:15",
+                "durationMinutes": 650,  # via DXB
+                "stops": [
+                    {
+                        "iataCode": "DXB",
+                        "duration": "PT2H00M",
+                        "arrivalAt": "06:00",
+                        "departureAt": "08:00",
+                        "terminal": "3",
+                    }
+                ],
+                "terminal_dep": "3",
+                "terminal_arr": "3",
+                "seats": 18,
+            },
+            {
+                "carrier": "BA",
+                "flightNo": "BA256",
+                "aircraft": "77W",
+                "departureTime": "13:30",
+                "durationMinutes": 585,  # 9h45m direct
+                "stops": [],
+                "terminal_dep": "3",
+                "terminal_arr": "5",
+                "seats": 6,
+            },
+        ],
+        "basePrices": {
+            "ECONOMY": 650,
+            "PREMIUM_ECONOMY": 1250,
+            "BUSINESS": 3200,
+            "FIRST": 7000,
+        },
+    },
+    ("BOM", "LHR"): {
+        "options": [
+            {
+                "carrier": "AI",
+                "flightNo": "AI111",
+                "aircraft": "789",
+                "departureTime": "02:35",
+                "durationMinutes": 575,  # 9h35m direct
+                "stops": [],
+                "terminal_dep": "2",
+                "terminal_arr": "2",
+                "seats": 10,
+            },
+            {
+                "carrier": "BA",
+                "flightNo": "BA138",
+                "aircraft": "77W",
+                "departureTime": "13:00",
+                "durationMinutes": 560,  # 9h20m direct
+                "stops": [],
+                "terminal_dep": "2",
+                "terminal_arr": "5",
+                "seats": 7,
+            },
+        ],
+        "basePrices": {
+            "ECONOMY": 620,
+            "PREMIUM_ECONOMY": 1200,
+            "BUSINESS": 3000,
+            "FIRST": 6800,
+        },
+    },
+    ("DEL", "DXB"): {
+        "options": [
+            {
+                "carrier": "AI",
+                "flightNo": "AI995",
+                "aircraft": "321",
+                "departureTime": "07:30",
+                "durationMinutes": 200,  # 3h20m
+                "stops": [],
+                "terminal_dep": "3",
+                "terminal_arr": "1",
+                "seats": 22,
+            },
+            {
+                "carrier": "EK",
+                "flightNo": "EK510",
+                "aircraft": "77W",
+                "departureTime": "13:30",
+                "durationMinutes": 195,
+                "stops": [],
+                "terminal_dep": "3",
+                "terminal_arr": "3",
+                "seats": 15,
+            },
+            {
+                "carrier": "6E",
+                "flightNo": "6E1413",
+                "aircraft": "321",
+                "departureTime": "22:00",
+                "durationMinutes": 205,
+                "stops": [],
+                "terminal_dep": "2",
+                "terminal_arr": "2",
+                "seats": 30,
+            },
+        ],
+        "basePrices": {
+            "ECONOMY": 180,
+            "PREMIUM_ECONOMY": 350,
+            "BUSINESS": 900,
+            "FIRST": 2000,
+        },
+    },
+    ("BOM", "SIN"): {
+        "options": [
+            {
+                "carrier": "SQ",
+                "flightNo": "SQ424",
+                "aircraft": "789",
+                "departureTime": "09:10",
+                "durationMinutes": 340,  # 5h40m
+                "stops": [],
+                "terminal_dep": "2",
+                "terminal_arr": "3",
+                "seats": 11,
+            },
+            {
+                "carrier": "AI",
+                "flightNo": "AI357",
+                "aircraft": "789",
+                "departureTime": "14:00",
+                "durationMinutes": 330,
+                "stops": [],
+                "terminal_dep": "2",
+                "terminal_arr": "1",
+                "seats": 16,
+            },
+        ],
+        "basePrices": {
+            "ECONOMY": 320,
+            "PREMIUM_ECONOMY": 620,
+            "BUSINESS": 1600,
+            "FIRST": 3500,
+        },
+    },
+    ("DEL", "SIN"): {
+        "options": [
+            {
+                "carrier": "SQ",
+                "flightNo": "SQ406",
+                "aircraft": "359",
+                "departureTime": "10:15",
+                "durationMinutes": 340,  # 5h40m
+                "stops": [],
+                "terminal_dep": "3",
+                "terminal_arr": "3",
+                "seats": 9,
+            },
+            {
+                "carrier": "AI",
+                "flightNo": "AI382",
+                "aircraft": "789",
+                "departureTime": "08:00",
+                "durationMinutes": 350,
+                "stops": [],
+                "terminal_dep": "3",
+                "terminal_arr": "1",
+                "seats": 14,
+            },
+        ],
+        "basePrices": {
+            "ECONOMY": 380,
+            "PREMIUM_ECONOMY": 720,
+            "BUSINESS": 1800,
+            "FIRST": 3800,
+        },
+    },
+    ("BLR", "SIN"): {
+        "options": [
+            {
+                "carrier": "SQ",
+                "flightNo": "SQ517",
+                "aircraft": "789",
+                "departureTime": "09:55",
+                "durationMinutes": 265,  # 4h25m
+                "stops": [],
+                "terminal_dep": "2",
+                "terminal_arr": "3",
+                "seats": 13,
+            },
+            {
+                "carrier": "AI",
+                "flightNo": "AI549",
+                "aircraft": "320",
+                "departureTime": "13:00",
+                "durationMinutes": 260,
+                "stops": [],
+                "terminal_dep": "2",
+                "terminal_arr": "1",
+                "seats": 20,
+            },
+        ],
+        "basePrices": {
+            "ECONOMY": 280,
+            "PREMIUM_ECONOMY": 540,
+            "BUSINESS": 1400,
+            "FIRST": 3200,
         },
     },
 }
@@ -711,6 +939,194 @@ HOTELS = {
             ],
         },
     ],
+    "DEL": [
+        {
+            "hotelId": "ADDELOB1",
+            "name": "THE OBEROI NEW DELHI",
+            "rating": "5",
+            "address": {
+                "lines": ["DR ZAKIR HUSSAIN MARG"],
+                "postalCode": "110003",
+                "cityName": "NEW DELHI",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 28.5981, "longitude": 77.2389},
+            "distance": {"value": 0.8, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT", "CONCIERGE"],
+            "rooms": [
+                {"type": "LUXURY_ROOM", "beds": 1, "bedType": "KING", "basePrice": 480, "description": "Luxury Room with city views"},
+                {"type": "SUITE", "beds": 1, "bedType": "KING", "basePrice": 1200, "description": "Oberoi Suite with Humayun's Tomb view"},
+            ],
+        },
+        {
+            "hotelId": "ADDELTJ1",
+            "name": "TAJ MAHAL HOTEL NEW DELHI",
+            "rating": "5",
+            "address": {
+                "lines": ["1 MANSINGH ROAD"],
+                "postalCode": "110011",
+                "cityName": "NEW DELHI",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 28.6015, "longitude": 77.2220},
+            "distance": {"value": 2.1, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT", "BAR"],
+            "rooms": [
+                {"type": "SUPERIOR_ROOM", "beds": 1, "bedType": "KING", "basePrice": 350, "description": "Superior Room"},
+                {"type": "LUXURY_ROOM", "beds": 1, "bedType": "KING", "basePrice": 450, "description": "Luxury Room with garden view"},
+                {"type": "SUITE", "beds": 1, "bedType": "KING", "basePrice": 980, "description": "Luxury Suite"},
+            ],
+        },
+        {
+            "hotelId": "ADDELLI1",
+            "name": "THE LEELA PALACE NEW DELHI",
+            "rating": "5",
+            "address": {
+                "lines": ["DIPLOMATIC ENCLAVE", "CHANAKYAPURI"],
+                "postalCode": "110023",
+                "cityName": "NEW DELHI",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 28.5973, "longitude": 77.1839},
+            "distance": {"value": 6.5, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT", "BUTLER_SERVICE"],
+            "rooms": [
+                {"type": "DELUXE_ROOM", "beds": 1, "bedType": "KING", "basePrice": 520, "description": "Deluxe Room"},
+                {"type": "SUITE", "beds": 1, "bedType": "KING", "basePrice": 1400, "description": "Royal Suite"},
+            ],
+        },
+        {
+            "hotelId": "ADDELITC1",
+            "name": "ITC MAURYA NEW DELHI",
+            "rating": "5",
+            "address": {
+                "lines": ["SARDAR PATEL MARG", "DIPLOMATIC ENCLAVE"],
+                "postalCode": "110021",
+                "cityName": "NEW DELHI",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 28.5994, "longitude": 77.1735},
+            "distance": {"value": 7.2, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT"],
+            "rooms": [
+                {"type": "CLASSIC_ROOM", "beds": 1, "bedType": "KING", "basePrice": 280, "description": "Classic Room"},
+                {"type": "EXECUTIVE_ROOM", "beds": 1, "bedType": "KING", "basePrice": 380, "description": "Executive Club Room"},
+            ],
+        },
+    ],
+    "BOM": [
+        {
+            "hotelId": "ADBOMTJ1",
+            "name": "TAJ MAHAL PALACE MUMBAI",
+            "rating": "5",
+            "address": {
+                "lines": ["APOLLO BUNDER"],
+                "postalCode": "400001",
+                "cityName": "MUMBAI",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 18.9220, "longitude": 72.8332},
+            "distance": {"value": 0.3, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT", "BAR", "CONCIERGE"],
+            "rooms": [
+                {"type": "SUPERIOR_ROOM", "beds": 1, "bedType": "KING", "basePrice": 380, "description": "Superior Room with harbour view"},
+                {"type": "GRAND_LUXURY_ROOM", "beds": 1, "bedType": "KING", "basePrice": 580, "description": "Grand Luxury Room in the Palace wing"},
+                {"type": "SUITE", "beds": 1, "bedType": "KING", "basePrice": 1500, "description": "Sea Lounge Suite"},
+            ],
+        },
+        {
+            "hotelId": "ADBOMOB1",
+            "name": "THE OBEROI MUMBAI",
+            "rating": "5",
+            "address": {
+                "lines": ["NARIMAN POINT"],
+                "postalCode": "400021",
+                "cityName": "MUMBAI",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 18.9245, "longitude": 72.8230},
+            "distance": {"value": 1.5, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT"],
+            "rooms": [
+                {"type": "DELUXE_ROOM", "beds": 1, "bedType": "KING", "basePrice": 420, "description": "Deluxe Room with Arabian Sea view"},
+                {"type": "SUITE", "beds": 1, "bedType": "KING", "basePrice": 1100, "description": "Luxury Suite"},
+            ],
+        },
+        {
+            "hotelId": "ADBOMFS1",
+            "name": "FOUR SEASONS HOTEL MUMBAI",
+            "rating": "5",
+            "address": {
+                "lines": ["1/136 DR E MOSES ROAD", "WORLI"],
+                "postalCode": "400018",
+                "cityName": "MUMBAI",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 19.0176, "longitude": 72.8178},
+            "distance": {"value": 4.2, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT", "BAR"],
+            "rooms": [
+                {"type": "SUPERIOR_ROOM", "beds": 1, "bedType": "KING", "basePrice": 320, "description": "Superior Room"},
+                {"type": "DELUXE_ROOM", "beds": 1, "bedType": "KING", "basePrice": 420, "description": "Deluxe Room with Bandra-Worli Sea Link view"},
+            ],
+        },
+    ],
+    "BLR": [
+        {
+            "hotelId": "ADBLRLL1",
+            "name": "THE LEELA PALACE BANGALORE",
+            "rating": "5",
+            "address": {
+                "lines": ["23 KODIHALLI", "HAL AIRPORT ROAD"],
+                "postalCode": "560008",
+                "cityName": "BANGALORE",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 12.9600, "longitude": 77.6480},
+            "distance": {"value": 9.5, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT", "BUTLER_SERVICE"],
+            "rooms": [
+                {"type": "DELUXE_ROOM", "beds": 1, "bedType": "KING", "basePrice": 320, "description": "Deluxe Room with garden view"},
+                {"type": "SUITE", "beds": 1, "bedType": "KING", "basePrice": 950, "description": "Royal Suite"},
+            ],
+        },
+        {
+            "hotelId": "ADBLRITC1",
+            "name": "ITC GARDENIA BANGALORE",
+            "rating": "5",
+            "address": {
+                "lines": ["1 RESIDENCY ROAD"],
+                "postalCode": "560025",
+                "cityName": "BANGALORE",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 12.9716, "longitude": 77.6006},
+            "distance": {"value": 2.3, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT"],
+            "rooms": [
+                {"type": "LUXURY_ROOM", "beds": 1, "bedType": "KING", "basePrice": 280, "description": "Luxury Room"},
+                {"type": "EXECUTIVE_ROOM", "beds": 1, "bedType": "KING", "basePrice": 360, "description": "Executive Club Room"},
+            ],
+        },
+        {
+            "hotelId": "ADBLROB1",
+            "name": "THE OBEROI BANGALORE",
+            "rating": "5",
+            "address": {
+                "lines": ["37-39 MAHATMA GANDHI ROAD"],
+                "postalCode": "560001",
+                "cityName": "BANGALORE",
+                "countryCode": "IN",
+            },
+            "geoCode": {"latitude": 12.9759, "longitude": 77.6074},
+            "distance": {"value": 1.1, "unit": "KM"},
+            "amenities": ["SWIMMING_POOL", "SPA", "FITNESS_CENTER", "WIFI", "RESTAURANT"],
+            "rooms": [
+                {"type": "LUXURY_ROOM", "beds": 1, "bedType": "KING", "basePrice": 350, "description": "Luxury Room"},
+                {"type": "SUITE", "beds": 1, "bedType": "KING", "basePrice": 1000, "description": "Kohinoor Suite"},
+            ],
+        },
+    ],
     "TYO": [
         {
             "hotelId": "ADTYOPA1",
@@ -769,4 +1185,7 @@ CITY_TO_HOTEL_CITY = {
     "BKK": "BKK",
     "HKG": "HKG",
     "FRA": "FRA",
+    "DEL": "DEL",
+    "BOM": "BOM",
+    "BLR": "BLR",
 }

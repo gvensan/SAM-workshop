@@ -179,18 +179,26 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 | Origin | Destination | Carriers |
 |---|---|---|
-| SIN | LHR | SQ, BA, QF |
+| SIN | LHR | SQ, BA, EK (via DXB) |
 | SIN | SYD | SQ, QF |
-| JFK | LAX | AA, UA, DL |
+| JFK | LAX | AA, UA |
 | LHR | CDG | BA, AF |
 | DXB | SIN | EK, SQ |
-| SIN | HND | SQ, NH, JL |
-| SIN | BKK | SQ, TG |
+| SIN | HND | SQ, JL |
+| SIN | BKK | SQ, TK |
 | HKG | LHR | CX, BA |
+| **DEL** | **LHR** | **AI, BA, EK (via DXB)** |
+| **BOM** | **LHR** | **AI, BA** |
+| **DEL** | **DXB** | **AI, EK, 6E** |
+| **BOM** | **SIN** | **SQ, AI** |
+| **DEL** | **SIN** | **SQ, AI** |
+| **BLR** | **SIN** | **SQ, AI** |
+
+> All routes are bidirectional — the mock returns results for both directions (e.g. LHR→DEL works as well as DEL→LHR).
 
 ### Supported Hotel Cities
 
-`SIN` (Singapore), `LON` (London), `PAR` (Paris), `TYO` (Tokyo), `NYC` (New York), `DXB` (Dubai), `BKK` (Bangkok)
+`SIN` (Singapore), `LON` (London), `PAR` (Paris), `TYO` (Tokyo), `NYC` (New York), `DXB` (Dubai), `BKK` (Bangkok), **`DEL` (New Delhi)**, **`BOM` (Mumbai)**, **`BLR` (Bangalore)**
 
 > **SAM Connector for Mock:** When configuring SAM Desktop connectors, use base URL `http://localhost:8080`, upload the spec from `external/amadeus-mock/openapi.json`, and set credentials `test`/`test`. See [Step 5.1](#51-create-openapi-connectors-amadeus) Option B for full steps.
 
@@ -648,12 +656,12 @@ Test each agent in isolation first in SAM Desktop chat:
 
 **[OpenAPI] FlightSearchAgent**
 ```
-@FlightSearchAgent Find flights from Singapore to Tokyo on 2025-04-15 returning 2025-04-20 for 2 adults
+@FlightSearchAgent Find flights from Singapore to Tokyo on 2026-09-15 returning 2026-09-20 for 2 adults
 ```
 
 **[OpenAPI] HotelSearchAgent**
 ```
-@HotelSearchAgent Find hotels in Tokyo from April 15 to 20, 2025 for 2 guests
+@HotelSearchAgent Find hotels in Tokyo from September 15 to 20, 2026 for 2 guests
 ```
 
 **[MCP] LocalExperiencesAgent**
@@ -670,7 +678,7 @@ Test each agent in isolation first in SAM Desktop chat:
 
 ```
 @TravelOrchestratorAgent Plan a 5-day trip from Singapore to Tokyo for 2 people.
-Departure: April 15, 2025. Return: April 20, 2025.
+Departure: September 15, 2026. Return: September 20, 2026.
 We enjoy Japanese cuisine, cultural sites, and outdoor activities.
 Include flights, hotels, restaurants, attractions, weather forecast, and full budget breakdown.
 ```
