@@ -10,6 +10,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "true").lower() != "false"
 
+# Static token accepted alongside OAuth-issued tokens, so clients without
+# OAuth2 support (e.g. SAM Desktop API connectors, which only offer HTTP
+# Basic/Bearer auth) can authenticate with a fixed Bearer token.
+# Set STATIC_BEARER_TOKEN="" to require OAuth-issued tokens only.
+STATIC_BEARER_TOKEN = os.getenv("STATIC_BEARER_TOKEN", "workshop")
+
 # In-memory token store: token -> expiry timestamp
 _active_tokens: dict[str, float] = {}
 
@@ -42,6 +48,11 @@ def verify_token(
         )
 
     token = credentials.credentials
+
+    # Fixed token for OAuth2-less clients (see STATIC_BEARER_TOKEN above)
+    if STATIC_BEARER_TOKEN and token == STATIC_BEARER_TOKEN:
+        return token
+
     expiry = _active_tokens.get(token)
 
     if expiry is None:

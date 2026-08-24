@@ -16,7 +16,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-PORT = int(os.environ.get("PORT", "10000"))
+PORT = int(os.environ.get("PORT", "10010"))
 
 # --- Open-Meteo Integration (completely free, no API key) ---
 

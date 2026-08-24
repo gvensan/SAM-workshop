@@ -1,0 +1,15 @@
+# macOS Finder junk
+.DS_Store
+
+# Working / review documents - not part of the workshop deliverable
+GIT_FIXES.md
+UPDATED README.md
+
+# Python virtualenvs and bytecode (created by the local-Python runtime option)
+.venv/
+__pycache__/
+*.pyc
+
+# Editor / IDE state
+.idea/
+.vscode/

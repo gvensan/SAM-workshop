@@ -4,7 +4,7 @@ services:
     image: amadeus-mock:latest
     container_name: amadeus-mock
     ports:
-      - "8080:8080"
+      - "8090:8090"
     environment:
       # --- Credentials ---
       # Change these to anything you like; your workshop apps must match.
@@ -15,11 +15,17 @@ services:
       # Set to "false" to skip Bearer token checks entirely (fastest for demos)
       REQUIRE_AUTH: "true"
 
+      # --- Static token ---
+      # Accepted alongside OAuth-issued tokens, for clients without OAuth2
+      # support (e.g. SAM Desktop API connectors: HTTP Basic/Bearer only).
+      # Set to "" to require OAuth-issued tokens only.
+      STATIC_BEARER_TOKEN: "workshop"
+
       # --- Token TTL ---
       TOKEN_TTL_SECONDS: "1799"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
