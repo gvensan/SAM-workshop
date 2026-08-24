@@ -5,26 +5,26 @@ One page to get all three workshop services running as plain Python processes - 
 ## Before you start
 
 - **Python 3.11 or 3.12** (`python3 --version`). **Not 3.13** - the mock pins an older pydantic with no 3.13 wheels; if you only have 3.13, install 3.12 and substitute `python3.12` below
-- You have your **Foursquare Legacy API Client ID and Client Secret** ([signup notes](../README.md#api-keys-required))
+- Credentials file created at the workshop root: `cp env.example .env`, then edit in your **Foursquare Legacy API Client ID and Client Secret** (optional: `ANTHROPIC_API_KEY` for AI recommendations) - see [One-Time Setup](../README.md#one-time-setup-credentials-file-env)
 - SAM Desktop is installed with `SAM_PLATFORM_ALLOW_PRIVATE_MCP=true` set ([Step 1.2](../README.md#12-allow-local-mcp-servers))
 - Debian/Ubuntu may need `sudo apt install python3-venv` first
 
 ## Start the services - macOS / Linux
 
 ```bash
-# Terminal 1 - Places MCP server (port 3010) - insert your Foursquare credentials
+# Terminal 1 - Places MCP server (port 3010) - reads Foursquare credentials from .env
+set -a; source .env; set +a
 cd external/places-mcp-server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-FOURSQUARE_CLIENT_ID="YOUR_CLIENT_ID" FOURSQUARE_CLIENT_SECRET="YOUR_CLIENT_SECRET" \
-  .venv/bin/python server.py
+.venv/bin/python server.py
 ```
 
 ```bash
-# Terminal 2 - Weather Advisor agent (port 10010) - no key needed
+# Terminal 2 - Weather Advisor agent (port 10010) - picks up ANTHROPIC_API_KEY from .env if set
+set -a; source .env; set +a
 cd external/weather-advisor-agent
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python agent.py
-# Optional AI recommendations: ANTHROPIC_API_KEY="sk-ant-..." .venv/bin/python agent.py
 ```
 
 ```bash
@@ -37,22 +37,21 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ## Start the services - Windows (PowerShell)
 
 ```powershell
-# Terminal 1 - Places MCP server (port 3010) - insert your Foursquare credentials
+# Terminal 1 - Places MCP server (port 3010) - reads Foursquare credentials from .env
+Get-Content .env | Where-Object { $_ -match '^[A-Za-z_]+=' } | ForEach-Object { $n, $v = $_ -split '=', 2; Set-Item -Path env:$n -Value $v }
 cd external\places-mcp-server
 py -3.12 -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-$env:FOURSQUARE_CLIENT_ID = "YOUR_CLIENT_ID"
-$env:FOURSQUARE_CLIENT_SECRET = "YOUR_CLIENT_SECRET"
 .venv\Scripts\python server.py
 ```
 
 ```powershell
-# Terminal 2 - Weather Advisor agent (port 10010) - no key needed
+# Terminal 2 - Weather Advisor agent (port 10010) - picks up ANTHROPIC_API_KEY from .env if set
+Get-Content .env | Where-Object { $_ -match '^[A-Za-z_]+=' } | ForEach-Object { $n, $v = $_ -split '=', 2; Set-Item -Path env:$n -Value $v }
 cd external\weather-advisor-agent
 py -3.12 -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 .venv\Scripts\python agent.py
-# Optional AI recommendations: set a real key first: $env:ANTHROPIC_API_KEY = "sk-ant-..."
 ```
 
 ```powershell
@@ -68,9 +67,9 @@ py -3.12 -m venv .venv
 ## Verify
 
 ```bash
-curl -s http://localhost:3010/health   # places-mcp
-curl -s http://localhost:10010/health  # weather-advisor
-curl -s http://localhost:8090/health   # amadeus-mock
+curl -sS http://localhost:3010/health  && echo ""   # places-mcp
+curl -sS http://localhost:10010/health && echo ""   # weather-advisor
+curl -sS http://localhost:8090/health  && echo ""   # amadeus-mock
 ```
 
 All three should return a small JSON status. After a crash, reboot, or closed terminal, rerun the start command in that service's terminal (the venvs persist; skip the `venv`/`pip` lines on reruns).

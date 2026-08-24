@@ -11,7 +11,7 @@ Step-by-step deployment of the Multi-Agent Travel Planning System with SAM Deskt
 - [Prerequisites](#prerequisites)
 - [Platform Notes](#platform-notes)
 - [Install & Start the Local Services](#install--start-the-local-services)
-- [Amadeus Mock Service (No API Key Required)](#amadeus-mock-service-no-api-key-required)
+- [Flight and Hotel Data: Amadeus Mock](#flight-and-hotel-data-amadeus-mock)
 - [Workshop - Hands-on](#workshop---hands-on)
   - [Step 1: Install & Configure SAM Desktop](#step-1-install--configure-sam-desktop)
   - [Step 2: Verify MCP Server (Places)](#step-2-verify-mcp-server-places)
@@ -35,7 +35,7 @@ This guide walks you through deploying the **Multi-Agent Travel Planning System*
 | Local Experiences | MCP Server | Local service (port 3010) |
 | Weather Advisor | External A2A Agent | Local service (port 10010) |
 
-The two local services run in Docker by default, or via Podman or plain Python - see [Install & Start the Local Services](#install--start-the-local-services). An optional **Amadeus Mock** stands in for the real Amadeus sandbox when you have no API key. Ports at a glance: Places MCP **3010**, Weather Advisor **10010**, Amadeus mock **8090**.
+The two local services run in Docker by default, or via Podman or plain Python - see [Install & Start the Local Services](#install--start-the-local-services). Flight and hotel data comes from the local **Amadeus Mock** - the real Amadeus Self-Service APIs were discontinued in July 2026 (see [Flight and Hotel Data](#flight-and-hotel-data-amadeus-mock)). Ports at a glance: Places MCP **3010**, Weather Advisor **10010**, Amadeus mock **8090**.
 
 ---
 
@@ -60,12 +60,11 @@ graph TB
         Weather["WeatherAdvisorAgent<br/><i>LangChain + Open-Meteo</i>"]
     end
 
-    subgraph MockSvcBox["Local service: amadeus-mock :8090 (optional)"]
+    subgraph MockSvcBox["Local service: amadeus-mock :8090"]
         MockSvc["Amadeus Mock Service<br/><i>FastAPI — no key needed</i>"]
     end
 
     subgraph APIs["External APIs (no containers)"]
-        Amadeus["Amadeus Sandbox"]
         Foursquare["Foursquare Places"]
         OpenMeteo["Open-Meteo (free)"]
     end
@@ -76,10 +75,8 @@ graph TB
     Orch --> Local
     Orch -.->|"A2A Protocol"| Weather
 
-    Flight -->|"OpenAPI/OAuth2"| Amadeus
-    Hotel -->|"OpenAPI/OAuth2"| Amadeus
-    Flight -. "OR (no key)" .-> MockSvc
-    Hotel -. "OR (no key)" .-> MockSvc
+    Flight -->|"OpenAPI/Bearer"| MockSvc
+    Hotel -->|"OpenAPI/Bearer"| MockSvc
     Local -->|"MCP/SSE"| PlacesMCP
     PlacesMCP --> Foursquare
     Weather --> OpenMeteo
@@ -103,16 +100,14 @@ graph TB
 
 | Service | Cost | Sign Up | Used By |
 |---|---|---|---|
-| **Amadeus for Developers** | Free sandbox | [developers.amadeus.com/register](https://developers.amadeus.com/register) | OpenAPI connector — flights & hotels (**or use mock — see below**) |
+| ~~Amadeus for Developers~~ | **Discontinued** (July 17, 2026) | - | Flights & hotels come from the included local mock instead - see below |
 | **Foursquare Places API** | Free (1,000 calls/day) | [foursquare.com/developers/signup](https://foursquare.com/developers/signup) | MCP server — restaurants & attractions |
 | **Anthropic Claude API** | Pay-as-you-go | [console.anthropic.com](https://console.anthropic.com/settings/keys) | A2A agent — activity recommendations (optional) |
 | **Open-Meteo** | Completely free — no signup | [open-meteo.com](https://open-meteo.com/) | A2A agent — weather data |
 
-> **No Amadeus key?** Use the included **Amadeus Mock Service** (`external/amadeus-mock/`). It runs locally (Docker, Podman, or plain Python), requires zero credentials, and returns realistic deterministic flight and hotel data. See the [Amadeus Mock Service](#amadeus-mock-service-no-api-key-required) section below.
+> **Flights & hotels: the included mock is the default.** Amadeus discontinued its free Self-Service API program on **July 17, 2026** (portal closed, keys deactivated, endpoints offline), so the workshop uses the local mock (`external/amadeus-mock/`): zero credentials, deterministic data, faithful to the discontinued API. See [Flight and Hotel Data: Amadeus Mock](#flight-and-hotel-data-amadeus-mock).
 
-> **Amadeus (real):** After signing up go to "My Self-Service Workspace" → "Create a new app". You'll receive an **API Key** (client_id) and **API Secret** (client_secret). The free sandbox uses synthetic test data only.
-
-> **Foursquare:** After signup go to Developer Console → Create a Project → click the project → open **Legacy API Keys**. Click the key to reveal the **Client ID** and **Client Secret** — you need both. The MCP server uses the Legacy Places API v2 (`api.foursquare.com/v2/venues/search`). Do _not_ use the single-field Service API Key (fsq3…) — that is for the v3 API which requires a paid plan to activate.
+> **Foursquare:** After signup go to Developer Console → Create a Project → click the project → open **Legacy API Keys**. Click the key to reveal the **Client ID** and **Client Secret** — you need both; they go into the workshop `.env` file (see [One-Time Setup](#one-time-setup-credentials-file-env)). The MCP server uses the Legacy Places API v2 (`api.foursquare.com/v2/venues/search`). Do _not_ use the single-field Service API Key (fsq3…) — that is for the v3 API which requires a paid plan to activate.
 
 ### Verify Prerequisites
 
@@ -236,7 +231,7 @@ cd dist && zip -j ../../../travel-planner.zip travel-planner manifest.yaml
 
 ## Install & Start the Local Services
 
-The workshop runs three local services: the Places MCP server (verified in Step 2), the Weather Advisor agent (verified in Step 3), and the optional Amadeus mock (smoke-tested in the [Mock section](#amadeus-mock-service-no-api-key-required)). This section is the single place where they are installed and started - the steps that follow only verify and configure. (Prefer a printable one-pager? Each runtime has a quickstart in [`docs/`](docs/): [Docker](docs/quickstart-docker.md), [Podman](docs/quickstart-podman.md), [local Python](docs/quickstart-local.md).) SAM Desktop, the Go toolset, and the connectors never need a container runtime. Pick the highest option available on your machine:
+The workshop runs three local services: the Places MCP server (verified in Step 2), the Weather Advisor agent (verified in Step 3), and the Amadeus mock (smoke-tested in the [Amadeus data section](#flight-and-hotel-data-amadeus-mock)). This section is the single place where they are installed and started - the steps that follow only verify and configure. (Prefer a printable one-pager? Each runtime has a quickstart in [`docs/`](docs/): [Docker](docs/quickstart-docker.md), [Podman](docs/quickstart-podman.md), [local Python](docs/quickstart-local.md).) SAM Desktop, the Go toolset, and the connectors never need a container runtime. Pick the highest option available on your machine:
 
 | Option | When | What changes in this guide |
 |---|---|---|
@@ -246,6 +241,19 @@ The workshop runs three local services: the Places MCP server (verified in Step 
 
 Whichever option you choose, everything downstream is identical: same ports (3010, 10010, 8090), same SAM connector URLs, same health checks and smoke tests, and the `SAM_PLATFORM_ALLOW_PRIVATE_MCP=true` setting (Step 1.2) is still required.
 
+### One-Time Setup: Credentials File (`.env`)
+
+All start commands below read your credentials from a `.env` file at the workshop root, so you never edit placeholders into commands:
+
+```bash
+cp env.example .env
+# Now edit .env:
+#   - set FOURSQUARE_CLIENT_ID and FOURSQUARE_CLIENT_SECRET (required)
+#   - optionally uncomment ANTHROPIC_API_KEY to enable Weather Advisor AI recommendations
+```
+
+> This is **not** SAM Desktop's `<SAM_DIR>/.env` from Step 1.2 - that one configures SAM itself. This `.env` lives in the workshop root, is gitignored, and only feeds the service start commands below.
+
 ### Option 1: Docker (Default)
 
 The default path. Make sure Docker Desktop (macOS/Windows) or the Docker daemon (Linux) is running. Containers carry `--restart unless-stopped`, so they come back after a reboot until you remove them.
@@ -253,20 +261,19 @@ The default path. Make sure Docker Desktop (macOS/Windows) or the Docker daemon 
 All three services in one go (run from the workshop root):
 
 ```bash
-# Places MCP server (port 3010) - needs your Foursquare Legacy credentials
+# Places MCP server (port 3010) - reads Foursquare credentials from .env
 docker build -t places-mcp-server external/places-mcp-server/
 docker run -d --name places-mcp -p 3010:3010 \
-  -e FOURSQUARE_CLIENT_ID="YOUR_CLIENT_ID" \
-  -e FOURSQUARE_CLIENT_SECRET="YOUR_CLIENT_SECRET" \
+  --env-file .env \
   --restart unless-stopped places-mcp-server
 
-# Weather Advisor agent (port 10010) - no key needed
+# Weather Advisor agent (port 10010) - key optional; picks up ANTHROPIC_API_KEY from .env if you set it
 docker build -t weather-advisor-agent external/weather-advisor-agent/
 docker run -d --name weather-advisor -p 10010:10010 \
+  --env-file .env \
   --restart unless-stopped weather-advisor-agent
-# Optional AI recommendations: add  -e ANTHROPIC_API_KEY="sk-ant-..."  to the run command
 
-# Amadeus mock (port 8090, optional) - no key needed
+# Amadeus mock (port 8090) - no key needed
 docker compose -f external/amadeus-mock/docker-compose.yml up -d --build
 ```
 
@@ -277,19 +284,17 @@ Podman is CLI-compatible with Docker: replace `docker` with `podman` everywhere 
 All three services in one go (run from the workshop root):
 
 ```bash
-# Places MCP server (port 3010) - needs your Foursquare Legacy credentials
+# Places MCP server (port 3010) - reads Foursquare credentials from .env
 podman build -t places-mcp-server external/places-mcp-server/
 podman run -d --name places-mcp -p 3010:3010 \
-  -e FOURSQUARE_CLIENT_ID="YOUR_CLIENT_ID" \
-  -e FOURSQUARE_CLIENT_SECRET="YOUR_CLIENT_SECRET" \
+  --env-file .env \
   places-mcp-server
 
-# Weather Advisor agent (port 10010) - no key needed
+# Weather Advisor agent (port 10010) - key optional; picks up ANTHROPIC_API_KEY from .env if you set it
 podman build -t weather-advisor-agent external/weather-advisor-agent/
-podman run -d --name weather-advisor -p 10010:10010 weather-advisor-agent
-# Optional AI recommendations: add  -e ANTHROPIC_API_KEY="sk-ant-..."  to the run command
+podman run -d --name weather-advisor -p 10010:10010 --env-file .env weather-advisor-agent
 
-# Amadeus mock (port 8090, optional) - no key needed
+# Amadeus mock (port 8090) - no key needed
 podman build -t amadeus-mock external/amadeus-mock/
 podman run -d --name amadeus-mock -p 8090:8090 amadeus-mock
 ```
@@ -310,19 +315,18 @@ Run all commands from the workshop root directory.
 
 ```bash
 # Terminal 1 - Places MCP server (port 3010)
+set -a; source .env; set +a   # loads the Foursquare credentials
 cd external/places-mcp-server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-FOURSQUARE_CLIENT_ID="YOUR_CLIENT_ID" FOURSQUARE_CLIENT_SECRET="YOUR_CLIENT_SECRET" \
-  .venv/bin/python server.py
+.venv/bin/python server.py
 ```
 
 ```bash
 # Terminal 2 - Weather Advisor agent (port 10010; ANTHROPIC_API_KEY optional)
+set -a; source .env; set +a   # picks up ANTHROPIC_API_KEY if set in .env
 cd external/weather-advisor-agent
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python agent.py
-# Optional AI recommendations - run with a real key instead:
-# ANTHROPIC_API_KEY="sk-ant-..." .venv/bin/python agent.py
 ```
 
 ```bash
@@ -336,22 +340,20 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 ```powershell
 # Terminal 1 - Places MCP server (port 3010)
+Get-Content .env | Where-Object { $_ -match '^[A-Za-z_]+=' } | ForEach-Object { $n, $v = $_ -split '=', 2; Set-Item -Path env:$n -Value $v }
 cd external\places-mcp-server
 py -3.12 -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-$env:FOURSQUARE_CLIENT_ID = "YOUR_CLIENT_ID"
-$env:FOURSQUARE_CLIENT_SECRET = "YOUR_CLIENT_SECRET"
 .venv\Scripts\python server.py
 ```
 
 ```powershell
 # Terminal 2 - Weather Advisor agent (port 10010; ANTHROPIC_API_KEY optional)
+Get-Content .env | Where-Object { $_ -match '^[A-Za-z_]+=' } | ForEach-Object { $n, $v = $_ -split '=', 2; Set-Item -Path env:$n -Value $v }
 cd external\weather-advisor-agent
 py -3.12 -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 .venv\Scripts\python agent.py
-# Optional AI recommendations - set a real key first, then rerun:
-# $env:ANTHROPIC_API_KEY = "sk-ant-..."
 ```
 
 ```powershell
@@ -368,19 +370,18 @@ py -3.12 -m venv .venv
 
 ```bash
 # Terminal 1 - Places MCP server (port 3010)
+set -a; source .env; set +a   # loads the Foursquare credentials
 cd external/places-mcp-server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-FOURSQUARE_CLIENT_ID="YOUR_CLIENT_ID" FOURSQUARE_CLIENT_SECRET="YOUR_CLIENT_SECRET" \
-  .venv/bin/python server.py
+.venv/bin/python server.py
 ```
 
 ```bash
 # Terminal 2 - Weather Advisor agent (port 10010; ANTHROPIC_API_KEY optional)
+set -a; source .env; set +a   # picks up ANTHROPIC_API_KEY if set in .env
 cd external/weather-advisor-agent
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python agent.py
-# Optional AI recommendations - run with a real key instead:
-# ANTHROPIC_API_KEY="sk-ant-..." .venv/bin/python agent.py
 ```
 
 ```bash
@@ -395,27 +396,20 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 After starting the services (any option), run these quick health checks; Steps 2 and 3 then verify each service in depth:
 
 ```bash
-curl -s http://localhost:3010/health   # places-mcp
-curl -s http://localhost:10010/health  # weather-advisor
-curl -s http://localhost:8090/health   # amadeus-mock (if started)
+curl -sS http://localhost:3010/health  && echo ""   # places-mcp
+curl -sS http://localhost:10010/health && echo ""   # weather-advisor
+curl -sS http://localhost:8090/health  && echo ""   # amadeus-mock
 ```
 
 ---
 
-## Amadeus Mock Service (No API Key Required)
+## Flight and Hotel Data: Amadeus Mock
 
-The workshop includes a local Amadeus mock service that simulates the real Amadeus flight and hotel APIs. Use this if you don't have an Amadeus API key or want fully offline demos.
+The FlightSearchAgent and HotelSearchAgent need an Amadeus-compatible API. This workshop uses the **local Amadeus mock** (`external/amadeus-mock/`): zero credentials, deterministic data, works offline - and it faithfully mirrors the Amadeus Self-Service API's endpoints, payloads, and OAuth2 flow.
 
-| | Real Amadeus Sandbox | Amadeus Mock |
-|---|---|---|
-| API key needed | Yes (free signup) | **No** |
-| Network required | Yes | No (runs locally) |
-| Data | Synthetic (Amadeus test data) | Deterministic mock data |
-| Rate limits | Yes | None |
-| Price consistency | Varies | Same query → same price |
-| Base URL | `https://test.api.amadeus.com` | `http://localhost:8090` |
+> **Why not the real Amadeus API?** Amadeus **discontinued its free Self-Service API program on July 17, 2026**: the developer portal is closed, existing API keys were deactivated, and `test.api.amadeus.com` no longer resolves - older tutorials referencing it fail with DNS errors ("Could not resolve host"). The separate, contracted Amadeus Enterprise program continues but is out of scope for a workshop. The mock below is therefore the default - and only - flight and hotel data source here.
 
-> **Starting the mock** is covered in [Install & Start the Local Services](#install--start-the-local-services) - it is included in the command blocks for all three runtimes (Docker, Podman, local Python), along with the health-check verification. Make sure it is running (`curl http://localhost:8090/health`) before trying the token and smoke tests below.
+> **Starting the mock** is covered in [Install & Start the Local Services](#install--start-the-local-services) - it is included in the command blocks for all three runtimes (Docker, Podman, local Python), along with the health-check verification. Make sure it is running (`curl -sS http://localhost:8090/health`) before the verification below.
 
 ### Configuration (Environment Variables)
 
@@ -428,19 +422,22 @@ All variables have working defaults - the mock needs zero configuration for the 
 | `STATIC_BEARER_TOKEN` | `workshop` | Fixed Bearer token accepted alongside OAuth-issued tokens, for clients without OAuth2 support (e.g. SAM's API connector). Set to `""` to require OAuth-issued tokens only |
 | `REQUIRE_AUTH` | `true` | Set to `false` to skip Bearer token checks entirely (fastest for quick demos; not recommended for the workshop) |
 
-### Generate a Bearer Token
+### Verify: Generate a Bearer Token
 
-The mock implements the same OAuth2 `client_credentials` flow as the real Amadeus API - and this is also how the SAM connector authenticates in [Step 5.1](#51-create-openapi-connectors-amadeus) Option B: SAM cannot run the flow itself (its connector has no OAuth2 support), so you fetch the token here and paste it in as a Bearer token. (Alternative: the static token `workshop` skips refresh entirely.)
+The mock implements the same OAuth2 `client_credentials` flow the real Amadeus API used - and this is also how the SAM connector authenticates in [Step 5.1](#51-create-the-amadeus-mock-connector-openapi): SAM's connector cannot run the client-credentials flow itself, so you fetch the token here and paste it in as a Bearer token. (Alternative: the static token `workshop` skips refresh entirely.)
+
+**1. Get an access token** (credentials `test`/`test`; the response has no trailing newline, so pretty-print via `json.tool`):
 
 ```bash
-# Get an access token (credentials: test / test)
-# The response has no trailing newline, so pretty-print it via json.tool
-curl -s -X POST http://localhost:8090/v1/security/oauth2/token \
+curl -sS -X POST http://localhost:8090/v1/security/oauth2/token \
   -d "client_id=test&client_secret=test&grant_type=client_credentials" \
   | python3 -m json.tool
+```
 
-# One-liner to capture it into a shell variable
-TOKEN=$(curl -s -X POST http://localhost:8090/v1/security/oauth2/token \
+**2. Capture it into a shell variable** (for the smoke tests below):
+
+```bash
+TOKEN=$(curl -sS -X POST http://localhost:8090/v1/security/oauth2/token \
   -d "client_id=test&client_secret=test&grant_type=client_credentials" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 echo "$TOKEN"
@@ -454,16 +451,20 @@ $TOKEN = $resp.access_token
 echo $TOKEN
 ```
 
-### Smoke Test
+### Verify: Smoke Test
+
+**1. Search for flights** (SIN → LHR on 2026-09-15):
 
 ```bash
-# Search for flights SIN → LHR on 2026-09-15
-curl -s -H "Authorization: Bearer $TOKEN" \
+curl -sS -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8090/v2/shopping/flight-offers?originLocationCode=SIN&destinationLocationCode=LHR&departureDate=2026-09-15&adults=1" \
   | python3 -m json.tool | head -40
+```
 
-# Search for hotels in London (city code LON)
-curl -s -H "Authorization: Bearer $TOKEN" \
+**2. Search for hotels** in London (city code LON):
+
+```bash
+curl -sS -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8090/v1/reference-data/locations/hotels/by-city?cityCode=LON" \
   | python3 -m json.tool | head -30
 ```
@@ -495,7 +496,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 `SIN` (Singapore), `LON` (London), `PAR` (Paris), `TYO` (Tokyo), `NYC` (New York), `DXB` (Dubai), `SYD` (Sydney), **`DEL` (New Delhi)**, **`BOM` (Mumbai)**, **`BLR` (Bangalore)**
 
-> **SAM Connector for Mock:** use base URL `http://localhost:8090`, upload the spec from `external/amadeus-mock/openapi.json`, and authenticate with an **HTTP Bearer token**: an OAuth-issued token (credentials `test`/`test`) or the no-expiry static token `workshop`. See [Step 5.1](#51-create-openapi-connectors-amadeus) Option B for full steps.
+> **SAM Connector for Mock:** use base URL `http://localhost:8090`, upload the spec from `external/amadeus-mock/openapi.json`, and authenticate with an **HTTP Bearer token**: an OAuth-issued token (credentials `test`/`test`) or the no-expiry static token `workshop`. See [Step 5.1](#51-create-the-amadeus-mock-connector-openapi) Option B for full steps.
 
 ---
 
@@ -503,7 +504,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 Everything above prepared the machine: services running, prerequisites checked. This hands-on part wires it all together in SAM Desktop and tests the full system.
 
-**Choose your path.** Start the services with your runtime, then continue at Step 1 - from there, every step is identical for all three runtimes:
+**Choose your path.** Create the credentials file if you have not yet ([One-Time Setup](#one-time-setup-credentials-file-env)), start the services with your runtime, then continue at Step 1 - from there, every step is identical for all three runtimes:
 
 | Your runtime | Start the services | One-page quickstart |
 |---|---|---|
@@ -547,7 +548,7 @@ Set-Content -Path "$env:APPDATA\sam\.env" -Value "SAM_PLATFORM_ALLOW_PRIVATE_MCP
 echo 'SAM_PLATFORM_ALLOW_PRIVATE_MCP=true' > ~/.config/sam/.env
 ```
 
-Then **quit and reopen SAM Desktop**. Verify it loaded (expected: `level=INFO msg="loaded desktop environment" path="...sam/.env"`):
+> **⚠️ Important: restart SAM Desktop now - this step does not take effect without it.** The `.env` file is read only at startup, so **quit SAM Desktop completely and reopen it** (closing the window is not enough - actually quit the app). Then **verify it loaded** with the command for your OS below; you must see a line like `level=INFO msg="loaded desktop environment" path="...sam/.env"`. If that line is missing, the SSRF opt-in is not active and every localhost connector in Step 5 will fail - do not continue until the verify passes.
 
 **macOS - verify:**
 
@@ -585,6 +586,7 @@ SAM-workshop/
 │   └── amadeus-mock/            # Local Amadeus mock, no API key needed (optional)
 ├── docs/                    # One-page per-runtime quickstarts
 ├── images/                  # Screenshots used in this guide
+├── env.example              # Credentials template - copy to .env (One-Time Setup)
 └── README.md                # This guide
 ```
 
@@ -600,13 +602,17 @@ The Places MCP Server exposes `find_restaurants` and `find_attractions` tools vi
 
 #### Verify
 
-```bash
-# Health check
-curl -s http://localhost:3010/health && echo ""
-# Expected: {"status":"healthy","server":"places-mcp-server","endpoint":"/mcp"}
+**1. Health check:**
 
-# MCP SSE handshake — should return the endpoint event immediately
-curl -N --max-time 3 http://localhost:3010/mcp
+```bash
+curl -sS http://localhost:3010/health && echo ""
+# Expected: {"status":"healthy","server":"places-mcp-server","endpoint":"/mcp"}
+```
+
+**2. MCP SSE handshake** - should print the endpoint event immediately:
+
+```bash
+curl -NsS --max-time 3 http://localhost:3010/mcp
 # Expected:
 # event: endpoint
 # data: /messages/?session_id=<uuid>
@@ -631,18 +637,25 @@ The Weather Advisor agent fetches forecasts from Open-Meteo (free, no key needed
 
 #### Verify
 
+**1. Health check:**
+
 ```bash
-# Health check
-curl http://localhost:10010/health
+curl -sS http://localhost:10010/health && echo ""
 # Expected: {"status":"healthy","agent":"WeatherAdvisorAgent"}
+```
 
-# A2A agent card — SAM Desktop tries agent-card.json first, then agent.json
-curl http://localhost:10010/.well-known/agent-card.json
-curl http://localhost:10010/.well-known/agent.json
-# Both should return the agent card JSON
+**2. A2A agent card** - SAM Desktop tries `agent-card.json` first, then `agent.json`; both paths serve the same card:
 
-# Test a weather query via A2A protocol
-curl -X POST http://localhost:10010/ \
+```bash
+curl -sS http://localhost:10010/.well-known/agent-card.json | python3 -m json.tool | head -8
+curl -sS http://localhost:10010/.well-known/agent.json | python3 -m json.tool | head -8
+# Expected: the agent card ("name": "WeatherAdvisorAgent", "url": "http://localhost:10010", ...) twice
+```
+
+**3. Weather query via the A2A protocol.** The forecast arrives as a JSON string embedded in the response artifact, so the one-liner at the end unwraps and pretty-prints it:
+
+```bash
+curl -sS -X POST http://localhost:10010/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -654,7 +667,9 @@ curl -X POST http://localhost:10010/ \
         "parts": [{"type": "text", "text": "Weather in Tokyo this week"}]
       }
     }
-  }'
+  }' | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps(json.loads(d['result']['artifacts'][0]['parts'][0]['text']), indent=2))"
+# Expected: readable JSON with "location": "Tokyo, Japan", a 7-day "forecast",
+# and "recommendations" (a skip notice unless ANTHROPIC_API_KEY was set)
 ```
 
 ---
@@ -677,7 +692,8 @@ Toolsets live under **Builder → Toolsets** in the SAM Desktop sidebar. The pag
    - **Tools:** click **Select Toolset File** and choose `toolsets/travel-planner.zip`
 ![SAM Desktop Create Toolset form filled in: name travel-planner, description, and travel-planner.zip attached](images/sam-create-toolset.png)
 
-4. Click **Create** - SAM extracts the binary and `manifest.yaml`, runs `--schema` to discover tools, then shows status **Ready**
+4. Click **Create** - SAM saves the toolset and opens an **Add Toolset to Agent** dialog (an Agent dropdown plus an **Agent Instructions** field):
+5. SAM extracts the binary and `manifest.yaml`, runs `--schema` to discover tools, then shows status **Ready**
 
 > **Status lag is normal.** Discovery itself completes in about a second, but the status can keep showing **Discovering Tools** for another minute or two while the result syncs on the runner's once-a-minute cycle - and the details page does not auto-refresh. Wait a moment, then go back to **Toolsets** and click **Refresh** (or reopen the toolset). To confirm from the terminal that discovery already succeeded: `grep -h "schema discovery complete" <SAM_DIR>/data/desktop*.log` (paths in [Platform Notes](#platform-notes)).
 
@@ -731,51 +747,18 @@ Compress-Archive -Force -Path dist\travel-planner.exe, dist\manifest.yaml -Desti
 
 ### Step 5: Configure SAM Desktop
 
-#### 5.1 Create OpenAPI Connectors (Amadeus)
+#### 5.1 Create the Amadeus Mock Connector (OpenAPI)
 
-Choose **Option B** (local mock - no key needed, **recommended**) or **Option A** (real Amadeus sandbox - requires an API key and manual token refresh).
+> Make sure the mock is running first (from the workshop root): `docker compose -f external/amadeus-mock/docker-compose.yml up -d --build`. (The real Amadeus Self-Service sandbox is **discontinued** - see [Flight and Hotel Data: Amadeus Mock](#flight-and-hotel-data-amadeus-mock).)
 
-> **SAM's API connector supports HTTP Authentication only (Basic Auth or Bearer Token) - there is no OAuth2 option.** Both options below work within that constraint. The connector wizard has three steps: **Configure Connector → Select Tools → Review Summary**.
+> **Why Bearer tokens?** SAM's API connector cannot run the OAuth2 **client-credentials** flow that the Amadeus API uses. Per the bundled SAM docs the connector offers None, API Key, HTTP Authentication (Basic/Bearer), and OAuth2/OIDC - but the OAuth2/OIDC option is the authorization-code grant (interactive user redirect; an Authorization Endpoint is required), which machine-to-machine APIs like Amadeus do not provide. (In the SAM Desktop 2.307.3 UI tested for this guide, the dropdown offered only HTTP Authentication.) The connector therefore authenticates with a **Bearer token**. The connector wizard has three steps: **Configure Connector → Select Tools → Review Summary**.
 
-##### Option A — Real Amadeus Sandbox (API key required)
-
-The real Amadeus API only accepts OAuth2-issued tokens, and SAM cannot fetch them for you. You therefore fetch a token manually and paste it into the connector as a Bearer token. **Sandbox tokens expire after ~30 minutes** - when calls start returning 401, fetch a fresh token and update both connectors. Fine for a short demo; for a workshop, prefer Option B.
-
-**1. Fetch an access token** (uses the API Key / API Secret from your Amadeus developer account):
-
-```bash
-curl -s -X POST https://test.api.amadeus.com/v1/security/oauth2/token \
-  -d "grant_type=client_credentials&client_id=YOUR_API_KEY&client_secret=YOUR_API_SECRET" \
-  | python3 -m json.tool
-# Copy the "access_token" value
-```
-
-**2. Flight Search Connector**
-
-1. SAM Desktop → **Builder → Connectors** → **Create Connector** → type **API** (OpenAPI)
-2. Connector Name: `amadeus-flights`
-3. OpenAPI Specification: upload the flight spec - download [FlightOffersSearch_v2.json](https://raw.githubusercontent.com/amadeus4dev/amadeus-open-api-specification/main/spec/json/FlightOffersSearch_v2.json) first
-4. Description: `Amadeus Self-Service Flight Offers Search (test sandbox).`
-5. Base Server URL: `https://test.api.amadeus.com`
-6. Authentication Type: **HTTP Authentication** → **Bearer Token** → paste the access token from step 1
-7. **Next: Select Tools** → select the flight search operations → **Review Summary** → Create
-
-**3. Hotel Search Connector**
-
-Repeat with the [HotelSearch_v3.json](https://raw.githubusercontent.com/amadeus4dev/amadeus-open-api-specification/main/spec/json/HotelSearch_v3.json) spec. Name: `amadeus-hotels`, Description: `Amadeus Self-Service Hotel Search (test sandbox).`
-
-> **Token expiry:** when the sandbox token expires (~30 min), re-run the token curl and update the Bearer token in both connectors. This is the cost of pairing an OAuth2-only API with a Bearer-token connector - the mock (Option B) avoids it entirely.
-
-##### Option B — Amadeus Mock (No API Key, Recommended)
-
-> Make sure the mock is running first (from the workshop root): `docker compose -f external/amadeus-mock/docker-compose.yml up -d --build`
-
-The mock implements the same OAuth2 `client_credentials` flow as the real Amadeus API, so the connector setup mirrors Option A: fetch a token, paste it in as the Bearer token. This keeps the workshop faithful to how the real integration authenticates.
+The mock implements the OAuth2 `client_credentials` flow, so the setup mirrors a real Amadeus integration: fetch a token, paste it in as the Bearer token.
 
 **1. Fetch an access token** (mock credentials: `test` / `test`):
 
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:8090/v1/security/oauth2/token \
+TOKEN=$(curl -sS -X POST http://localhost:8090/v1/security/oauth2/token \
   -d "client_id=test&client_secret=test&grant_type=client_credentials" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 echo "$TOKEN"    # copy this value
@@ -783,7 +766,7 @@ echo "$TOKEN"    # copy this value
 
 **2. Create the connector - a single connector covers both flights and hotels:**
 
-1. SAM Desktop → **Builder → Connectors** → **Create Connector** → type **API** (OpenAPI)
+1. SAM Desktop → **Builder → Connectors** → **Create Connector** → click on **Custom** tab and choose **OpenAPI**
 2. Connector Name: `amadeus-mock`
 3. OpenAPI Specification: upload `external/amadeus-mock/openapi.json`
 4. Description: `Mock implementation of the Amadeus Self-Service flight and hotel APIs. OAuth2 client_credentials, mock credentials test/test.`
@@ -798,10 +781,9 @@ echo "$TOKEN"    # copy this value
 > The mock's `openapi.json` includes all endpoints (flights + hotels) in a single file so you only need one connector. Point both `FlightSearchAgent` and `HotelSearchAgent` to `amadeus-mock`.
 
 > **SSRF note:** `SAM_PLATFORM_ALLOW_PRIVATE_MCP=true` (Step 1.2) also unblocks HTTP connectors pointing to `localhost`. This is required for the mock connector to work.
-
 #### 5.2 Create MCP Connector (Places)
 
-1. SAM Desktop → **Builder → Connectors** → **Create Connector** → type **MCP** (Remote MCP)
+1. SAM Desktop → **Builder → Connectors** → **Create Connector** → type **Remote MCP**
 2. Connector Name: `places-mcp`
 3. Description: `Finds restaurants and attractions near a destination via the Foursquare Places API. Provides the find_restaurants and find_attractions MCP tools.`
 4. MCP Server URL: `http://localhost:3010/mcp`
@@ -813,7 +795,11 @@ echo "$TOKEN"    # copy this value
 
 #### 5.3 Register External A2A Agent
 
-1. SAM Desktop → **Agents** → **Add Remote Agent**
+Agents are managed under **Builder → Agent Management** in the sidebar. The page lists deployed agents (the internal system agents ship pre-deployed) with a **Deployed / Undeployed** tab pair - newly created agents may appear under **Undeployed** until deployed. The **+ Add Agent** button carries a dropdown: click it directly to create a SAM agent (used in 5.4), or open the dropdown for **Add External Agent** (used here):
+
+![SAM Desktop Agent Management page (Builder → Agent Management) with the Add Agent dropdown button and Deployed/Undeployed tabs](images/sam-agent-management.png)
+
+1. SAM Desktop → **Builder → Agent Management** → **+ Add Agent** dropdown → **Add External Agent**
 2. Agent URL: `http://localhost:10010`
 3. Agent Card Location: **well_known**
 4. Authentication: **None**
@@ -821,12 +807,16 @@ echo "$TOKEN"    # copy this value
 
 #### 5.4 Create SAM Agents
 
+All four agents follow the same creation flow. Clicking **+ Add Agent** opens the **Create Agent** dialog, which defaults to an AI-assisted generator ("describe the problems your agent should solve" → Generate). For this workshop, use the manual form instead: click **Create Manually** (bottom left of the dialog) and fill in the exact Name, Description, and Instruction given per agent below - the fields map one-to-one.
+
+![Create Agent dialog: AI-generate prompt by default, with the Create Manually link at the bottom left](images/sam-create-agent-dialog.png)
+
 ##### FlightSearchAgent
 
-1. Agents → Add Agent → Name: `FlightSearchAgent`
+1. **Builder → Agent Management** → **+ Add Agent** → **Create Manually** → Name: `FlightSearchAgent`
 2. Description: `Searches for flights using the Amadeus API and returns structured flight options`
-3. Connector: `amadeus-flights` (or `amadeus-mock`)
-4. **Instruction** (paste the full prompt below), then **Save**:
+3. Connector: `amadeus-mock`
+4. **Instruction** (paste the full prompt below), then click **Create and Deploy**:
 
 ```
 You are the Flight Search specialist for a travel planning system. Your role is to find the best flight options using the Amadeus API.
@@ -838,7 +828,7 @@ SEARCH PROCESS:
 4. If no direct results, try nearby airports or alternate dates
 
 IATA CODE REFERENCE:
-- Singapore: SIN | London: LHR | Paris: CDG | Tokyo: HND (prefer HND; NRT only returns results on the real Amadeus sandbox, not the local mock)
+- Singapore: SIN | London: LHR | Paris: CDG | Tokyo: HND (the mock serves HND only; NRT returns no results)
 - New York: JFK or EWR | Los Angeles: LAX | Dubai: DXB | Sydney: SYD
 - Bangkok: BKK | Hong Kong: HKG | Amsterdam: AMS | Frankfurt: FRA
 - Kuala Lumpur: KUL | Seoul: ICN | Delhi: DEL | Mumbai: BOM | Bangalore: BLR
@@ -862,10 +852,10 @@ Always quote prices in the currency returned by the API. If the search returns n
 
 ##### HotelSearchAgent
 
-1. Agents → Add Agent → Name: `HotelSearchAgent`
+1. **Builder → Agent Management** → **+ Add Agent** → **Create Manually** → Name: `HotelSearchAgent`
 2. Description: `Searches for hotels using the Amadeus API and returns structured accommodation options`
-3. Connector: `amadeus-hotels` (or `amadeus-mock`)
-4. **Instruction** (paste the full prompt below), then **Save**:
+3. Connector: `amadeus-mock`
+4. **Instruction** (paste the full prompt below), then click **Create and Deploy**:
 
 ```
 You are the Hotel Search specialist for a travel planning system. Your role is to find the best accommodation options using the Amadeus API.
@@ -880,7 +870,7 @@ DXB (Dubai), SYD (Sydney), DEL (New Delhi), BOM (Mumbai), BLR (Bangalore)
 
 When converting destination names: London→LON, Paris→PAR, Tokyo→TYO, New York→NYC, Singapore→SIN, Delhi→DEL, Mumbai→BOM, Bangalore→BLR, Sydney→SYD
 
-These are the cities available on the local mock. If connected to the real Amadeus sandbox, other major city codes may also return results.
+These are the cities available on the mock.
 
 RESPONSE FORMAT:
 Present 3–5 hotel options in a structured table covering:
@@ -901,10 +891,10 @@ Calculate total accommodation cost for the full stay. Note any mandatory fees or
 
 ##### LocalExperiencesAgent
 
-1. Agents → Add Agent → Name: `LocalExperiencesAgent`
+1. **Builder → Agent Management** → **+ Add Agent** → **Create Manually** → Name: `LocalExperiencesAgent`
 2. Description: `Finds restaurants and attractions at the destination using Foursquare`
 3. Connector: `places-mcp`
-4. **Instruction** (paste the full prompt below), then **Save**:
+4. **Instruction** (paste the full prompt below), then click **Create and Deploy**:
 
 ```
 You are the Local Experiences specialist for a travel planning system. Your role is to discover the best restaurants and attractions at travel destinations using real-time local data.
@@ -933,10 +923,10 @@ Close with a suggested 1-day highlights itinerary combining the top picks from b
 
 ##### TravelOrchestratorAgent
 
-1. Agents → Add Agent → Name: `TravelOrchestratorAgent`
+1. **Builder → Agent Management** → **+ Add Agent** → **Create Manually** → Name: `TravelOrchestratorAgent`
 2. Description: `Master orchestrator that coordinates all travel agents to build a complete trip plan`
 3. Toolset: `travel-planner`
-4. **Instruction** (paste the full prompt below), then **Save**:
+4. **Instruction** (paste the full prompt below), then click **Create and Deploy**:
 
 ```
 You are the Travel Orchestrator — the master coordinator of a multi-agent travel planning system. Your role is to deliver a complete, personalised travel plan by coordinating specialised agents and assembling their results into a polished itinerary.
@@ -989,21 +979,28 @@ STYLE GUIDELINES:
 
 #### 6.1 Pre-flight Checks
 
+**1. All containers running?** (local Python mode: skip this, go to the health checks)
+
 ```bash
-# All containers running? (local Python mode: skip docker ps, run the health checks)
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 # NAMES             STATUS          PORTS
 # places-mcp        Up X minutes    0.0.0.0:3010->3010/tcp
 # weather-advisor   Up X minutes    0.0.0.0:10010->10010/tcp
-# amadeus-mock      Up X minutes    0.0.0.0:8090->8090/tcp    (only if using the mock)
+# amadeus-mock      Up X minutes    0.0.0.0:8090->8090/tcp
+```
 
-# Health checks
-curl -s http://localhost:3010/health  && echo ""
-curl -s http://localhost:10010/health && echo ""
-curl -s http://localhost:8090/health  && echo ""   # only if using the mock
+**2. Health checks:**
 
-# MCP SSE handshake
-curl -N --max-time 2 http://localhost:3010/mcp
+```bash
+curl -sS http://localhost:3010/health  && echo ""
+curl -sS http://localhost:10010/health && echo ""
+curl -sS http://localhost:8090/health  && echo ""
+```
+
+**3. MCP SSE handshake:**
+
+```bash
+curl -NsS --max-time 2 http://localhost:3010/mcp
 # Expected: event: endpoint / data: /messages/?session_id=...
 # (curl exiting with "(28) Operation timed out" after printing the event is
 #  expected - SSE streams stay open; --max-time just cuts it off)
@@ -1064,16 +1061,15 @@ Include flights, hotels, restaurants, attractions, weather forecast, and full bu
 | MCP test returns empty SSE stream (no endpoint event) | Wrong transport — server using streamable HTTP instead of legacy SSE | The server must expose `GET /mcp` returning `event: endpoint\ndata: /messages/?session_id=...`. Rebuild from latest `server.py`. |
 | Toolset shows "Discovering Tools" right after Create | Usually status lag, not a failure: discovery completes in ~1s but the result syncs on a ~1-minute cycle, and the details page does not auto-refresh | Wait 1-2 minutes, click **Refresh** on the Toolsets page (or reopen the toolset). Confirm in logs: `grep -h "schema discovery complete" <SAM_DIR>/data/desktop*.log` |
 | Toolset never leaves "Discovering" (no "schema discovery complete" in the log) | `manifest.yaml` has tool-name suffix in executable path | Correct format: `executable: ./travel-planner` (not `./travel-planner compile_itinerary`). Fix the manifest, repack, re-upload. The included zip already has the correct manifest. |
-| A2A agent not discovered by SAM | Container not running or agent card unreachable | Check: `curl http://localhost:10010/.well-known/agent.json`. Re-register in SAM Agents → Add Remote Agent. |
+| A2A agent not discovered by SAM | Container not running or agent card unreachable | Check: `curl http://localhost:10010/.well-known/agent.json`. Re-register: **Builder → Agent Management** → **+ Add Agent** dropdown → **Add External Agent**. |
 | "agent card fetch returned status 404" when registering A2A agent | SAM Desktop tries `/.well-known/agent-card.json` first before falling back to `/.well-known/agent.json` — the server was only serving the second path | The agent now serves both paths. Rebuild: `docker rm -f weather-advisor && docker build -t weather-advisor-agent external/weather-advisor-agent/ && docker run -d --name weather-advisor -p 10010:10010 weather-advisor-agent` |
-| Foursquare returns 401 | Wrong key type (Service API Key instead of Legacy) or invalid credentials | Go to Foursquare Developer Console → project → **Legacy API Keys** → click the key to reveal Client ID and Client Secret. Restart container with correct env vars. |
-| Real Amadeus sandbox returns empty results | The sandbox has limited test routes (this row is for Option A; for the mock see the routes row below) | Try popular sandbox routes: LHR→CDG, JFK→LAX, SIN→NRT, SYD→MEL |
+| Foursquare returns 401 | Wrong key type (Service API Key instead of Legacy) or invalid credentials | Go to Foursquare Developer Console → project → **Legacy API Keys** → click the key to reveal Client ID and Client Secret. Fix the values in `.env`, then `docker rm -f places-mcp` and re-run its start command from [Install & Start the Local Services](#install--start-the-local-services). |
 | Mock connector returns "connection refused" | Mock container not running | `docker compose -f external/amadeus-mock/docker-compose.yml up -d --build` then retry |
-| Mock returns 401 Unauthorized | OAuth-issued token expired (~30 min TTL) or invalidated by a mock restart, or the token was mistyped | Fetch a fresh token and update the connector (5.1 Option B), or switch the connector to the static token `workshop` (never expires, survives restarts) |
-| Real Amadeus connector starts returning 401 after ~30 minutes | Sandbox tokens expire (1799s) and SAM has no OAuth2 to auto-refresh them | Fetch a new token and update the connector Bearer token (5.1 Option A) - or switch to the mock (Option B), which never expires |
+| curl to `test.api.amadeus.com` fails: "Could not resolve host" | Amadeus discontinued the Self-Service APIs on July 17, 2026 - the host no longer exists | Use the local mock, the workshop default - see [Flight and Hotel Data: Amadeus Mock](#flight-and-hotel-data-amadeus-mock) |
+| Mock returns 401 Unauthorized | OAuth-issued token expired (~30 min TTL) or invalidated by a mock restart, or the token was mistyped | Fetch a fresh token and update the connector (Step 5.1), or switch the connector to the static token `workshop` (never expires, survives restarts) |
 | Mock returns empty flight results | Unsupported route | Mock covers 14 routes (either direction): SIN↔LHR, SIN↔SYD, SIN↔HND, SIN↔BKK, JFK↔LAX, LHR↔CDG, DXB↔SIN, HKG↔LHR, DEL↔LHR, BOM↔LHR, DEL↔DXB, DEL↔SIN, BOM↔SIN, BLR↔SIN. Note Tokyo is HND only - NRT returns empty. |
 | SAM OpenAPI connector rejects mock spec upload | Spec format issue | Use `external/amadeus-mock/openapi.json` (JSON format). The `openapi.yaml` in the same folder will be rejected by SAM — use the `.json` file. |
-| Weather agent returns no AI recommendations | `ANTHROPIC_API_KEY` not set | Restart: `docker rm -f weather-advisor && docker run -d --name weather-advisor -p 10010:10010 -e ANTHROPIC_API_KEY="sk-..." --restart unless-stopped weather-advisor-agent` |
+| Weather agent returns no AI recommendations | `ANTHROPIC_API_KEY` not set in `.env` | Uncomment/set `ANTHROPIC_API_KEY=sk-ant-...` in `.env`, then `docker rm -f weather-advisor` and re-run its start command (which reads `.env`) from [Install & Start the Local Services](#install--start-the-local-services) |
 | `curl http://localhost:3010/health` returns "Connection reset by peer" but container shows healthy | Uvicorn bound to IPv6-only (`::`) inside container; Docker Desktop bridge (macOS/Windows) is IPv4 only | Ensure `ENV HOST=0.0.0.0` is in the Dockerfile (already included). Rebuild the image. |
 | Port already in use (3010 or 10010) | Another process using the port | Find: `lsof -i :3010` (macOS/Linux) or `netstat -ano \| findstr :3010` (Windows). Kill it or use alternate port: `-p 3002:3010` and update SAM connector URL. |
 | `pip install` fails: "No matching distribution found for pydantic-core" (local Python mode) | Python 3.13 has no wheels for the mock's pinned pydantic | Use Python 3.11 or 3.12 for the venvs - see [Install & Start the Local Services](#install--start-the-local-services). |
@@ -1083,7 +1079,7 @@ Include flights, hotels, restaurants, attractions, weather forecast, and full bu
 | `docker compose` says "'compose' is not a docker command" | Older Docker with only the standalone Compose v1 binary | Use `docker-compose` (hyphenated) with the same arguments, or update Docker Desktop / install Compose v2 |
 | Podman (macOS/Windows): every `podman` command or `curl` fails or hangs | Podman VM not started | `podman machine start`, then re-check with `podman ps` |
 | `podman compose` not found or errors | Compose provider not installed | `pip install podman-compose`, or skip compose: use the plain `podman build` + `podman run` fallback in [Install & Start the Local Services](#install--start-the-local-services) |
-| Weather agent logs authentication / `invalid x-api-key` errors | A placeholder `ANTHROPIC_API_KEY` (e.g. `YOUR_ANTHROPIC_API_KEY`) was set - any non-empty value makes the agent call Claude | Run without the variable (Docker: omit `-e ANTHROPIC_API_KEY`; local: unset it), or supply a real key |
+| Weather agent logs authentication / `invalid x-api-key` errors | A placeholder `ANTHROPIC_API_KEY` value (e.g. left uncommented in `.env` without a real key) - any non-empty value makes the agent call Claude | Comment the line out in `.env` (or unset the variable) and restart the agent, or supply a real key |
 | `curl` output garbled or errors in PowerShell | PowerShell aliases `curl` to `Invoke-WebRequest` | Call `curl.exe` explicitly - see [Platform Notes](#platform-notes) |
 
 #### Container Management Cheatsheet
@@ -1105,8 +1101,7 @@ docker restart amadeus-mock
 # Remove and re-run (after env var change)
 docker rm -f places-mcp
 docker run -d --name places-mcp -p 3010:3010 \
-  -e FOURSQUARE_CLIENT_ID="YOUR_CLIENT_ID" \
-  -e FOURSQUARE_CLIENT_SECRET="YOUR_CLIENT_SECRET" \
+  --env-file .env \
   --restart unless-stopped places-mcp-server
 
 # Amadeus mock (no credentials needed)
@@ -1125,10 +1120,13 @@ Works as-is on macOS and Linux. On Windows, run it in **Git Bash** or **WSL** (s
 ```bash
 #!/bin/bash
 # Run from the workshop root (SAM-workshop/)
-# Usage: FOURSQUARE_CLIENT_ID=xxx FOURSQUARE_CLIENT_SECRET=xxx ./start-workshop.sh
-# If you have no Amadeus key, set USE_MOCK=true to start the local mock instead.
+# Usage: ./start-workshop.sh   (reads credentials from .env - cp env.example .env first)
+# Set USE_MOCK=true to also start the local Amadeus mock.
 
 set -e
+
+# Load workshop credentials if present
+[ -f .env ] && set -a && . ./.env && set +a
 
 USE_MOCK="${USE_MOCK:-false}"
 
@@ -1172,20 +1170,20 @@ fi
 sleep 3
 echo ""
 echo "=== Health Checks ==="
-curl -s http://localhost:3010/health  && echo ""
-curl -s http://localhost:10010/health && echo ""
+curl -sS http://localhost:3010/health  && echo ""
+curl -sS http://localhost:10010/health && echo ""
 if [ "$USE_MOCK" = "true" ]; then
-  curl -s http://localhost:8090/health && echo ""
+  curl -sS http://localhost:8090/health && echo ""
   echo ""
   echo "=== Mock Token Test ==="
-  TOKEN=$(curl -s -X POST http://localhost:8090/v1/security/oauth2/token \
+  TOKEN=$(curl -sS -X POST http://localhost:8090/v1/security/oauth2/token \
     -d "client_id=test&client_secret=test&grant_type=client_credentials" \
     | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
   echo "Token: ${TOKEN:0:20}..."
 fi
 echo ""
 echo "=== MCP SSE Handshake ==="
-curl -s --max-time 2 http://localhost:3010/mcp | head -2
+curl -sS --max-time 2 http://localhost:3010/mcp | head -2
 echo ""
 echo "=== All services running! ==="
 echo ""
@@ -1211,9 +1209,9 @@ A fresh run needs two cleanups: the local services (runtime-specific) and the SA
 
 **2. Delete the SAM Desktop artifacts.** SAM stores everything you created in the UI internally, so delete it there - in reverse order of creation, to avoid dependency errors (delete actions are on each item's page or list row; exact labels may vary by SAM version):
 
-1. **Agents** → delete `TravelOrchestratorAgent`, then `FlightSearchAgent`, `HotelSearchAgent`, `LocalExperiencesAgent`
-2. **Agents** → remove the remote agent registration `WeatherAdvisorAgent`
-3. **Builder → Connectors** → delete `amadeus-mock` (and `amadeus-flights` / `amadeus-hotels` if created) and `places-mcp`
+1. **Builder → Agent Management** → delete `TravelOrchestratorAgent`, then `FlightSearchAgent`, `HotelSearchAgent`, `LocalExperiencesAgent` (check both the **Deployed** and **Undeployed** tabs)
+2. **Builder → Agent Management** → remove the external agent registration `WeatherAdvisorAgent`
+3. **Builder → Connectors** → delete `amadeus-mock` and `places-mcp`
 4. **Builder → Toolsets** → delete `travel-planner`
 
 **What to keep:** `<SAM_DIR>/.env` (the `SAM_PLATFORM_ALLOW_PRIVATE_MCP=true` opt-in) and the LLM provider configuration - both are machine preparation, not exercise state, and carry over to the next run.

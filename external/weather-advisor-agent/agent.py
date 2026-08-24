@@ -121,7 +121,9 @@ async def handle_task(request_data: dict) -> dict:
 
     city = extract_city(query)
     if not city:
-        city = query.strip()
+        # No known prefix - treat the query as the city itself, still
+        # stripping punctuation and trailing time expressions
+        city = _strip_time_suffix(query.strip().rstrip("?.!").strip())
 
     coords = await get_coordinates(city)
     if not coords:
@@ -165,13 +167,31 @@ async def handle_task(request_data: dict) -> dict:
     return _task_response(req_id, json.dumps(result, indent=2))
 
 
+# Trailing time expressions users naturally append ("Weather in Tokyo this week")
+# that would otherwise be sent to the geocoder as part of the city name.
+_TIME_SUFFIXES = [
+    "this week", "next week", "this weekend", "next weekend",
+    "this month", "next month", "today", "tomorrow", "tonight",
+    "right now", "now",
+]
+
+
+def _strip_time_suffix(city: str) -> str:
+    lowered = city.lower()
+    for suffix in _TIME_SUFFIXES:
+        if lowered.endswith(suffix):
+            return city[: len(city) - len(suffix)].strip().rstrip(",")
+    return city
+
+
 def extract_city(query: str) -> str:
     lower = query.lower()
     for prefix in ["weather in ", "weather for ", "forecast for ", "forecast in ",
                    "what's the weather in ", "weather at ", "plan trip to ",
-                   "what will the weather be like in "]:
+                   "what will the weather be like in ", "rain in ", "snow in "]:
         if prefix in lower:
-            return query[lower.index(prefix) + len(prefix):].strip().rstrip("?.!")
+            city = query[lower.index(prefix) + len(prefix):].strip().rstrip("?.!").strip()
+            return _strip_time_suffix(city)
     return ""
 
 

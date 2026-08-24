@@ -5,24 +5,23 @@ One page to get all three workshop services running with Docker. Works identical
 ## Before you start
 
 - Docker Desktop (macOS/Windows) or the Docker daemon (Linux) is running: `docker info`
-- You have your **Foursquare Legacy API Client ID and Client Secret** ([signup notes](../README.md#api-keys-required))
+- Credentials file created at the workshop root: `cp env.example .env`, then edit in your **Foursquare Legacy API Client ID and Client Secret** (optional: `ANTHROPIC_API_KEY` for AI recommendations) - see [One-Time Setup](../README.md#one-time-setup-credentials-file-env)
 - SAM Desktop is installed with `SAM_PLATFORM_ALLOW_PRIVATE_MCP=true` set ([Step 1.2](../README.md#12-allow-local-mcp-servers))
 
 ## Start the services
 
 ```bash
-# 1. Places MCP server (port 3010) - insert your Foursquare credentials
+# 1. Places MCP server (port 3010) - reads Foursquare credentials from .env
 docker build -t places-mcp-server external/places-mcp-server/
 docker run -d --name places-mcp -p 3010:3010 \
-  -e FOURSQUARE_CLIENT_ID="YOUR_CLIENT_ID" \
-  -e FOURSQUARE_CLIENT_SECRET="YOUR_CLIENT_SECRET" \
+  --env-file .env \
   --restart unless-stopped places-mcp-server
 
-# 2. Weather Advisor agent (port 10010) - no key needed
+# 2. Weather Advisor agent (port 10010) - key optional; picks up ANTHROPIC_API_KEY from .env if set
 docker build -t weather-advisor-agent external/weather-advisor-agent/
 docker run -d --name weather-advisor -p 10010:10010 \
+  --env-file .env \
   --restart unless-stopped weather-advisor-agent
-# Optional AI recommendations: add  -e ANTHROPIC_API_KEY="sk-ant-..."  to the run command
 
 # 3. Amadeus mock (port 8090) - no key needed; --build guards against stale images
 docker compose -f external/amadeus-mock/docker-compose.yml up -d --build
@@ -31,9 +30,9 @@ docker compose -f external/amadeus-mock/docker-compose.yml up -d --build
 ## Verify
 
 ```bash
-curl -s http://localhost:3010/health   # places-mcp
-curl -s http://localhost:10010/health  # weather-advisor
-curl -s http://localhost:8090/health   # amadeus-mock
+curl -sS http://localhost:3010/health  && echo ""   # places-mcp
+curl -sS http://localhost:10010/health && echo ""   # weather-advisor
+curl -sS http://localhost:8090/health  && echo ""   # amadeus-mock
 ```
 
 All three should return a small JSON status. Containers carry `--restart unless-stopped`, so they come back after a reboot until you remove them (`docker rm -f <name>`).
